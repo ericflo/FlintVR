@@ -134,6 +134,9 @@ function vrmain(env) {
             if (!this._start) {
               this._start = ts;
             }
+            if (this._touchdown) {
+              return;
+            }
             var secondsElapsed = (ts - this._start); // Seconds
             this.rotation.x = secondsElapsed;
             this.rotation.y = secondsElapsed * 0.8;
@@ -148,8 +151,17 @@ function vrmain(env) {
             this.scale.y = 1;
             this.scale.z = 1;
           },
+          onGestureTouchDown: function() {
+            this._touchdown = true;
+            this.rotation.x = 0;
+            this.rotation.y = 0;
+          },
           onGestureTouchUp: function() {
+            this._touchdown = false;
             env.scene.remove(this);
+          },
+          onGestureTouchCancel: function() {
+            this._touchdown = false;
           }
         });
         env.scene.add(cube);

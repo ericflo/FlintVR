@@ -357,7 +357,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchDown callback\n");
 						}
 					}
-				} else if (model->isTouching && touchReleased) {
+				}
+
+				if (model->isTouching && touchReleased) {
 					model->isTouching = false;
 					// TODO: Construct an object (with t0, u, v ?) to pass in
 					if (!model->onGestureTouchUp.empty()) {
