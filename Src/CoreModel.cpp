@@ -184,6 +184,69 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     model->onHoverOut.construct(cx, onHoverOut);
   }
 
+  // Pull out the onGestureTouchDown callback if we find one
+  JS::RootedValue onGestureTouchDownVal(cx);
+  if (JS_GetProperty(cx, opts, "onGestureTouchDown", &onGestureTouchDownVal) &&
+      !onGestureTouchDownVal.isNullOrUndefined()) {
+    if (!onGestureTouchDownVal.isObject()) {
+      JS_ReportError(cx, "onGestureTouchDown callback is expected to be a function");
+      return false;
+    }
+    JS::RootedObject onGestureTouchDownObj(cx, &onGestureTouchDownVal.toObject());
+    if (!JS_ObjectIsFunction(cx, onGestureTouchDownObj)) {
+      JS_ReportError(cx, "onGestureTouchDown callback is expected to be a function");
+      return false;
+    }
+    // Make sure 'this' refers to the model in JS
+    JS::RootedObject boundOnGestureTouchDownObj(cx, JS_BindCallable(cx, onGestureTouchDownObj, self));
+    // Persist the callback in our data structure
+    JS::PersistentRootedValue onGestureTouchDown(cx, JS::ObjectOrNullValue(boundOnGestureTouchDownObj));
+    model->onGestureTouchDown.destroyIfConstructed();
+    model->onGestureTouchDown.construct(cx, onGestureTouchDown);
+  }
+
+  // Pull out the onGestureTouchUp callback if we find one
+  JS::RootedValue onGestureTouchUpVal(cx);
+  if (JS_GetProperty(cx, opts, "onGestureTouchUp", &onGestureTouchUpVal) &&
+      !onGestureTouchUpVal.isNullOrUndefined()) {
+    if (!onGestureTouchUpVal.isObject()) {
+      JS_ReportError(cx, "onGestureTouchUp callback is expected to be a function");
+      return false;
+    }
+    JS::RootedObject onGestureTouchUpObj(cx, &onGestureTouchUpVal.toObject());
+    if (!JS_ObjectIsFunction(cx, onGestureTouchUpObj)) {
+      JS_ReportError(cx, "onGestureTouchUp callback is expected to be a function");
+      return false;
+    }
+    // Make sure 'this' refers to the model in JS
+    JS::RootedObject boundOnGestureTouchUpObj(cx, JS_BindCallable(cx, onGestureTouchUpObj, self));
+    // Persist the callback in our data structure
+    JS::PersistentRootedValue onGestureTouchUp(cx, JS::ObjectOrNullValue(boundOnGestureTouchUpObj));
+    model->onGestureTouchUp.destroyIfConstructed();
+    model->onGestureTouchUp.construct(cx, onGestureTouchUp);
+  }
+
+  // Pull out the onGestureTouchCancel callback if we find one
+  JS::RootedValue onGestureTouchCancelVal(cx);
+  if (JS_GetProperty(cx, opts, "onGestureTouchCancel", &onGestureTouchCancelVal) &&
+      !onGestureTouchCancelVal.isNullOrUndefined()) {
+    if (!onGestureTouchCancelVal.isObject()) {
+      JS_ReportError(cx, "onGestureTouchCancel callback is expected to be a function");
+      return false;
+    }
+    JS::RootedObject onGestureTouchCancelObj(cx, &onGestureTouchCancelVal.toObject());
+    if (!JS_ObjectIsFunction(cx, onGestureTouchCancelObj)) {
+      JS_ReportError(cx, "onGestureTouchCancel callback is expected to be a function");
+      return false;
+    }
+    // Make sure 'this' refers to the model in JS
+    JS::RootedObject boundOnGestureTouchCancelObj(cx, JS_BindCallable(cx, onGestureTouchCancelObj, self));
+    // Persist the callback in our data structure
+    JS::PersistentRootedValue onGestureTouchCancel(cx, JS::ObjectOrNullValue(boundOnGestureTouchCancelObj));
+    model->onGestureTouchCancel.destroyIfConstructed();
+    model->onGestureTouchCancel.construct(cx, onGestureTouchCancel);
+  }
+
   if (!JS_SetProperty(cx, self, "geometry", geometry)) {
     JS_ReportError(cx, "Could not set geometry property on model object");
     return false;
@@ -216,6 +279,9 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   model->onFrame.destroyIfConstructed();
   model->onHoverOver.destroyIfConstructed();
   model->onHoverOut.destroyIfConstructed();
+  model->onGestureTouchDown.destroyIfConstructed();
+  model->onGestureTouchUp.destroyIfConstructed();
+  model->onGestureTouchCancel.destroyIfConstructed();
   // TODO: Figure out what to do about ownership of this value and whether to free it
   delete model;
 }

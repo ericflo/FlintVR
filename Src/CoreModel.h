@@ -16,7 +16,11 @@ typedef struct Model {
   mozilla::Maybe<JS::PersistentRootedValue> onFrame;
 	mozilla::Maybe<JS::PersistentRootedValue> onHoverOver;
 	mozilla::Maybe<JS::PersistentRootedValue> onHoverOut;
+  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchDown;
+  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchUp;
+  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancel;
 	bool isHovered;
+  bool isTouching;
 } Model;
 
 int GetNextModelId();

@@ -30,6 +30,10 @@ JSObject* NewCoreScene(JSContext *cx, CoreScene* scene) {
 		JS_ReportError(cx, "Could not create scene.add function");
 		return NULL;
 	}
+	if (!JS_DefineFunction(cx, self, "remove", &CoreScene_remove, 0, 0)) {
+		JS_ReportError(cx, "Could not create scene.remove function");
+		return NULL;
+	}
 	if (!JS_DefineFunction(cx, self, "setClearColor", &CoreScene_setClearColor, 0, 0)) {
 		JS_ReportError(cx, "Could not create scene.setClearColor function");
 		return NULL;
@@ -78,7 +82,7 @@ bool CoreScene_add(JSContext *cx, unsigned argc, JS::Value *vp) {
 		return false;
 	}
 	if (!args[0].isObject()) {
-		JS_ReportError(cx, "Expected add to take a geometry argument");
+		JS_ReportError(cx, "Expected add to take a model argument");
 		return false;
 	}
 
@@ -116,6 +120,44 @@ bool CoreScene_add(JSContext *cx, unsigned argc, JS::Value *vp) {
 	JS::RootedValue rval(cx);
 	if (!JS_CallFunctionValue(cx, objects, pushFuncVal, pushArgs, &rval)) {
 		__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call scene.objects.push\n");
+	}
+
+	return true;
+}
+
+bool CoreScene_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
+	JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+	// Check the arguments length
+	if (args.length() != 1) {
+		JS_ReportError(cx, "Wrong number of arguments: %d, was expecting: %d", argc, 1);
+		return false;
+	}
+	if (!args[0].isObject()) {
+		JS_ReportError(cx, "Expected remove to take a model argument");
+		return false;
+	}
+
+	// Read the model object in
+	JS::RootedObject model(cx, &args[0].toObject());
+	JS::RootedObject thisObj(cx, &args.thisv().toObject());
+	CoreScene* scene = (CoreScene*)JS_GetPrivate(thisObj);
+
+	int idx = scene->graph->indexOf(GetCoreModel(model));
+	if (idx == -1) {
+		JS_ReportError(cx, "Could not find model to remove");
+		return false;
+	}
+	scene->graph->remove(idx);
+
+	JS::RootedValue rval(cx);
+
+	OVR::String script;
+	script.Format("this.objects.splice(%d, 1)", idx);
+	const char* scriptStr = script.ToCStr();
+	if (!JS_EvaluateScript(cx, thisObj, scriptStr, OVR::OVR_strlen(scriptStr), "nofilename", 1, &rval)) {
+		JS_ReportError(cx, "Could not evaluate model remove script");
+		return false;
 	}
 
 	return true;

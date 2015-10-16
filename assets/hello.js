@@ -147,11 +147,13 @@ function vrmain(env) {
             this.scale.x = 1;
             this.scale.y = 1;
             this.scale.z = 1;
+          },
+          onGestureTouchUp: function() {
+            env.scene.remove(this);
           }
         });
         env.scene.add(cube);
       }
     }
   }
-
 }

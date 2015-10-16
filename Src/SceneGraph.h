@@ -8,6 +8,8 @@ public:
 	SceneGraph();
 	int count();
 	void add(Model* node);
+  int indexOf(Model* node);
+  void remove(int i);
 	Model* at(int i);
 	void reclaim();
 private:

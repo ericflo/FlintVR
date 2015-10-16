@@ -15,14 +15,30 @@ void SceneGraph::add(Model* node) {
 	objects[_count++] = node;
 }
 
+int SceneGraph::indexOf(Model* node) {
+  for (int i = 0; i < _count; ++i) {
+    if (objects[i]->id == node->id) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void SceneGraph::remove(int i) {
+  _count--;
+  for (int j = i; j < _count; ++j) {
+    objects[j] = objects[j+1];
+  }
+}
+
 void SceneGraph::resize() {
 	int nextCapacity;
   if (_count == 0) {
-    nextCapacity = 10;
+    nextCapacity = 1;
   } else {
     nextCapacity = _capacity * 2;
   }
-  Model** nextObjects = new Model*[_capacity];
+  Model** nextObjects = new Model*[nextCapacity];
   for (int i = 0; i < _count; ++i) {
     nextObjects[i] = objects[i];
     objects[i] = NULL;

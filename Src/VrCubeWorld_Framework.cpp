@@ -252,6 +252,10 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 	OVR::Vector3f* viewPos = new OVR::Vector3f( GetViewMatrixPosition( CenterEyeViewMatrix ) );
 	OVR::Vector3f* viewFwd = new OVR::Vector3f( GetViewMatrixForward( CenterEyeViewMatrix ) );
 
+	bool touchPressed = ( vrFrame.Input.buttonPressed & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
+	bool touchReleased = !touchPressed && ( vrFrame.Input.buttonReleased & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
+	//bool touchDown = ( vrFrame.Input.buttonState & BUTTON_TOUCH ) != 0;
+
 	// Show any errors
 	if (!LATEST_ERROR.IsEmpty()) {
 		app->ShowInfoText(ERROR_DISPLAY_SECONDS, "%s", LATEST_ERROR.ToCStr());
@@ -327,39 +331,67 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 				}
 			}
 
+			JS::RootedValue callback(cx);
+
 			// If we found an intersection
 			if (foundIntersection) {
-				// If we already knew about it, move on to the next
-				if (model->isHovered) {
-					continue;
+
+				if (!model->isHovered) {
+					model->isHovered = true;
+					// Call the onHoverOver callback
+					if (!model->onHoverOver.empty()) {
+						callback = JS::RootedValue(cx, model->onHoverOver.ref());
+						// TODO: Construct an object (with t0, u, v ?) to pass in
+						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOver callback\n");
+						}
+					}
 				}
-				// Otherwise, mark that we've seen the intersection
-				model->isHovered = true;
-				// If we have no callback, bail early
-				if (model->onHoverOver.empty()) {
-					continue;
-				}
-				// Call the onHoverOver callback
-				JS::RootedValue callback(cx, model->onHoverOver.ref());
-				// TODO: Construct an object (with t0, u, v ?) to pass in
-				if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
-					__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOver callback\n");
+
+				if (!model->isTouching && touchPressed) {
+					model->isTouching = true;
+					// TODO: Construct an object (with t0, u, v ?) to pass in
+					if (!model->onGestureTouchDown.empty()) {
+						callback = JS::RootedValue(cx, model->onGestureTouchDown.ref());
+						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchDown callback\n");
+						}
+					}
+				} else if (model->isTouching && touchReleased) {
+					model->isTouching = false;
+					// TODO: Construct an object (with t0, u, v ?) to pass in
+					if (!model->onGestureTouchUp.empty()) {
+						callback = JS::RootedValue(cx, model->onGestureTouchUp.ref());
+						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchUp callback\n");
+						}
+					}
 				}
 			} else {
 				// If we found no intersection and we weren't hovering on it before, move on
 				if (!model->isHovered) {
 					continue;
 				}
+
 				// Otherwise, we've just hovered off of it, so mark that
 				model->isHovered = false;
-				// If we have no callback, bail early
-				if (model->onHoverOut.empty()) {
-					continue;
+
+				if (model->isTouching) {
+					model->isTouching = false;
+					if (!model->onGestureTouchCancel.empty()) {
+						callback = JS::RootedValue(cx, model->onGestureTouchCancel.ref());
+						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchCancel callback\n");
+						}
+					}
 				}
+
 				// Call the onHoverOut callback
-				JS::RootedValue callback(cx, model->onHoverOut.ref());
-				if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
-					__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOut callback\n");
+				if (!model->onHoverOut.empty()) {
+					callback = JS::RootedValue(cx, model->onHoverOut.ref());
+					if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+						__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOut callback\n");
+					}
 				}
 			}
 		}
