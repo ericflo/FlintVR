@@ -13,6 +13,7 @@ typedef struct Model {
 	OVR::Vector3f* position;
 	OVR::Vector3f* rotation;
 	OVR::Vector3f* scale;
+  mozilla::Maybe<JS::PersistentRootedValue> onFrame;
 	mozilla::Maybe<JS::PersistentRootedValue> onHoverOver;
 	mozilla::Maybe<JS::PersistentRootedValue> onHoverOut;
 	bool isHovered;

@@ -6,23 +6,6 @@ var CUBE_ROWS = 10;
 var CUBE_COLS = 10;
 var CUBE_LAYERS = 3;
 
-var VIEW_CUBE_DISTANCE = 10;
-
-function frame(cubes, viewIndicator, start, env) {
-  var secondsElapsed = ((new Date()).getTime() - start) / 1000.0; // Seconds
-  for (var i = 0; i < cubes.length; ++i) {
-    cubes[i].rotation.x = secondsElapsed;
-    cubes[i].rotation.y = secondsElapsed * 0.8;
-  }
-  /*
-  var pos = env.viewPos.add(env.viewFwd.multiply(VIEW_CUBE_DISTANCE));
-  // TODO: Make this not necessary
-  viewIndicator.position.x = pos.x;
-  viewIndicator.position.y = pos.y;
-  viewIndicator.position.z = pos.z;
-  */
-}
-
 function vrmain(env) {
   var Geometry        = env.core.Geometry;
   var Program         = env.core.Program;
@@ -134,9 +117,7 @@ function vrmain(env) {
     vertices: cubeVertices,
     indices: cubeIndices
   });
-
-  var cubes = [];
-    for (var i = 0; i < CUBE_ROWS; ++i) {
+  for (var i = 0; i < CUBE_ROWS; ++i) {
     for (var j = 0; j < CUBE_COLS; ++j) {
       for (var k = 0; k < CUBE_LAYERS; ++k) {
         var cube = Model({
@@ -149,6 +130,14 @@ function vrmain(env) {
           ),
           rotation: Vector3f(0, 0, 0),
           scale: Vector3f(1, 1, 1),
+          onFrame: function(ts) {
+            if (!this._start) {
+              this._start = ts;
+            }
+            var secondsElapsed = (ts - this._start); // Seconds
+            this.rotation.x = secondsElapsed;
+            this.rotation.y = secondsElapsed * 0.8;
+          },
           onHoverOver: function() {
             this.scale.x = 1.4;
             this.scale.y = 1.4;
@@ -161,20 +150,8 @@ function vrmain(env) {
           }
         });
         env.scene.add(cube);
-        cubes.push(cube);
       }
     }
   }
 
-  var viewIndicator = Model({
-    geometry: cubeGeometry,
-    program: program,
-    position: Vector3f(0, 0, 0),
-    rotation: Vector3f(0, 0, Math.PI),
-    scale: Vector3f(0.05, 0.05, 1000)
-  });
-  //env.scene.add(viewIndicator);
-
-  var start = (new Date()).getTime();
-  return frame.bind(this, cubes, viewIndicator, start);
 }

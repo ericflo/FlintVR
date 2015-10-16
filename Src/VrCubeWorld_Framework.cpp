@@ -35,6 +35,8 @@ Copyright	:	Copyright 2015 Oculus VR, LLC. All Rights reserved.
 	#define GL( func )		func;
 #endif
 
+#define ERROR_DISPLAY_SECONDS 10
+
 #define LOG_COMPONENT "VrCubeWorld"
 
 /*
@@ -50,6 +52,21 @@ namespace OVR
 
 static const int CPU_LEVEL			= 1;
 static const int GPU_LEVEL			= 1;
+
+OVR::String PREVIOUS_ERROR;
+OVR::String LATEST_ERROR;
+
+void reportError(JSContext *cx, const char *message, JSErrorReport *report) {
+	OVR::String err = OVR::String::Format("%s:%u:%s\n",
+			report->filename ? report->filename : "[no filename]",
+      (unsigned int) report->lineno,
+      message);
+	if (err != PREVIOUS_ERROR) {
+		PREVIOUS_ERROR = err;
+		LATEST_ERROR = err;
+		__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "%s", err.ToCStr());
+	}
+}
 
 class VrCubeWorld : public VrAppInterface
 {
@@ -78,7 +95,6 @@ private:
 	JSRuntime * 		   SpidermonkeyJSRuntime;
 	JSContext *            SpidermonkeyJSContext;
 	mozilla::Maybe<JS::PersistentRootedObject> SpidermonkeyGlobal;
-	mozilla::Maybe<JS::PersistentRootedValue> RunloopCallback;
 	float				RandomFloat();
 	CoreScene* coreScene;
 };
@@ -119,13 +135,6 @@ float VrCubeWorld::RandomFloat()
 	return (*(float *)&rf) - 1.0f;
 }
 
-void reportError(JSContext *cx, const char *message, JSErrorReport *report) {
-	__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "%s:%u:%s\n",
-			report->filename ? report->filename : "[no filename]",
-            (unsigned int) report->lineno,
-            message);
-}
-
 void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launchIntentJSON, const char * launchIntentURI )
 {
 	auto java = app->GetJava();
@@ -138,6 +147,8 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 	String fontName;
 	GetLocale().GetString( "@string/font_name", "efigs.fnt", fontName );
 	GuiSys->Init( this->app, *SoundEffectPlayer, fontName.ToCStr(), &app->GetDebugLines() );
+
+	//app->SetShowFPS(true);
 
 	// Load the hello.js script into memory
 	const char* filename = "hello.js";
@@ -176,7 +187,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 		bool ok = JS_EvaluateScript(cx, global, (const char*)AAsset_getBuffer(asset), AAsset_getLength(asset), filename, lineno, &rval);
 		AAsset_close(asset);
 		if (!ok) {
-			return;
+			app->ShowInfoText(ERROR_DISPLAY_SECONDS, "Could not evaluate script");
 		}
 
 		// Build the environment to send to vrmain
@@ -197,28 +208,12 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 		JS::RootedValue envValue(cx, JS::ObjectOrNullValue(env));
 
 		// Call vrmain from script
-		ok = JS_CallFunctionName(cx, global, "vrmain", JS::HandleValueArray(envValue), &rval);
-		if (!ok) {
-			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call vrmain\n");
-			return;
+		if (ok) {
+			ok = JS_CallFunctionName(cx, global, "vrmain", JS::HandleValueArray(envValue), &rval);
+			if (!ok) {
+				__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call vrmain\n");
+			}
 		}
-
-		// Check that the return type is an object (functions are objects too)
-		if (!rval.isObject()) {
-			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Got invalid response from vrmain\n");
-			return;
-		}
-
-
-		// Now make sure that it's actually a function
-		JS::RootedObject func(cx, &rval.toObject());
-		if (!JS_ObjectIsFunction(cx, func)) {
-			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Got non-function object response from vrmain\n");
-			return;
-		}
-
-		RunloopCallback.destroyIfConstructed();
-		RunloopCallback.construct(SpidermonkeyJSRuntime, JS::PersistentRootedValue(cx, rval));
 
 		SpidermonkeyGlobal.destroyIfConstructed();
 		SpidermonkeyGlobal.construct(SpidermonkeyJSRuntime, global);
@@ -229,7 +224,6 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 
 void VrCubeWorld::OneTimeShutdown()
 {
-	RunloopCallback.destroyIfConstructed();
 	JS_DestroyContext(SpidermonkeyJSContext);
 	JS_DestroyRuntime(SpidermonkeyJSRuntime);
 	JS_ShutDown();
@@ -258,6 +252,12 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 	OVR::Vector3f* viewPos = new OVR::Vector3f( GetViewMatrixPosition( CenterEyeViewMatrix ) );
 	OVR::Vector3f* viewFwd = new OVR::Vector3f( GetViewMatrixForward( CenterEyeViewMatrix ) );
 
+	// Show any errors
+	if (!LATEST_ERROR.IsEmpty()) {
+		app->ShowInfoText(ERROR_DISPLAY_SECONDS, "%s", LATEST_ERROR.ToCStr());
+		LATEST_ERROR.Clear();
+	}
+
 	// Call the function returned from vrmain
 	JSContext *cx = SpidermonkeyJSContext;
 
@@ -281,84 +281,83 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 		}
 		JS::RootedValue envValue(cx, JS::ObjectOrNullValue(env));
 
-		// Call the frame callback
-		JS::RootedValue callback(cx, RunloopCallback.ref());
+		// We're gonna have some rvals going on in here, guess we'll make one for reference
 		JS::RootedValue rval(cx);
-		if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(envValue), &rval)) {
-			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call frame callback\n");
-		}
-	}
 
-	// Call hover and collision callbacks
-	for (int i = 0; i < coreScene->graph->count(); ++i) {
-		Model* model = coreScene->graph->at(i);
-		if (model == NULL) {
-			continue;
-		}
-		if (model->onHoverOver.empty() && model->onHoverOut.empty()) {
-			continue;
-		}
-
-		// Set up model matrix
-		OVR::Matrix4f matrix = (
-				OVR::Matrix4f::RotationX(model->rotation->x) *
-				OVR::Matrix4f::RotationY(model->rotation->y) *
-				OVR::Matrix4f::RotationZ(model->rotation->z)
-		) * OVR::Matrix4f::Scaling(*(model->scale));
-		matrix.SetTranslation(*(model->position));
-
-		// Check for an intersection of one of the triangles of the model
-		bool foundIntersection = false;
-		OVR::Array<OVR::Vector3f> vertices = model->geometry->vertices->position;
-		for (int j = 0; j < model->geometry->indices.GetSizeI(); j += 3) {
-			OVR::Vector3f v0 = matrix.Transform(vertices[model->geometry->indices[j]]);
-			OVR::Vector3f v1 = matrix.Transform(vertices[model->geometry->indices[j + 1]]);
-			OVR::Vector3f v2 = matrix.Transform(vertices[model->geometry->indices[j + 2]]);
-			float t0, u, v;
-			if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
-				foundIntersection = true;
-				break;
-			}
-		}
-
-		// If we found an intersection
-		if (foundIntersection) {
-			// If we already knew about it, move on to the next
-			if (model->isHovered) {
+		// Call the frame callbacks
+		double now = vrapi_GetTimeInSeconds();
+		JS::RootedValue nowVal(cx, JS::NumberValue(now));
+		for (int i = 0; i < coreScene->graph->count(); ++i) {
+			Model* model = coreScene->graph->at(i);
+			if (model->onFrame.empty()) {
 				continue;
 			}
-			// Otherwise, mark that we've seen the intersection
-			model->isHovered = true;
-			// If we have no callback, bail early
-			if (model->onHoverOver.empty()) {
+			JS::RootedValue callback(cx, model->onFrame.ref());
+			if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(nowVal), &rval)) {
+				__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onFrame callback\n");
+			}
+		}
+
+		// Call hover and collision callbacks
+		for (int i = 0; i < coreScene->graph->count(); ++i) {
+			Model* model = coreScene->graph->at(i);
+			if (model->onHoverOver.empty() && model->onHoverOut.empty()) {
 				continue;
 			}
-			// Call the onHoverOver callback
-			{
-				JSAutoCompartment ac(cx, global);
+
+			// Set up model matrix
+			OVR::Matrix4f matrix = (
+					OVR::Matrix4f::RotationX(model->rotation->x) *
+					OVR::Matrix4f::RotationY(model->rotation->y) *
+					OVR::Matrix4f::RotationZ(model->rotation->z)
+			) * OVR::Matrix4f::Scaling(*(model->scale));
+			matrix.SetTranslation(*(model->position));
+
+			// Check for an intersection of one of the triangles of the model
+			bool foundIntersection = false;
+			OVR::Array<OVR::Vector3f> vertices = model->geometry->vertices->position;
+			for (int j = 0; j < model->geometry->indices.GetSizeI(); j += 3) {
+				OVR::Vector3f v0 = matrix.Transform(vertices[model->geometry->indices[j]]);
+				OVR::Vector3f v1 = matrix.Transform(vertices[model->geometry->indices[j + 1]]);
+				OVR::Vector3f v2 = matrix.Transform(vertices[model->geometry->indices[j + 2]]);
+				float t0, u, v;
+				if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
+					foundIntersection = true;
+					break;
+				}
+			}
+
+			// If we found an intersection
+			if (foundIntersection) {
+				// If we already knew about it, move on to the next
+				if (model->isHovered) {
+					continue;
+				}
+				// Otherwise, mark that we've seen the intersection
+				model->isHovered = true;
+				// If we have no callback, bail early
+				if (model->onHoverOver.empty()) {
+					continue;
+				}
+				// Call the onHoverOver callback
 				JS::RootedValue callback(cx, model->onHoverOver.ref());
-				JS::RootedValue rval(cx);
 				// TODO: Construct an object (with t0, u, v ?) to pass in
 				if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
 					__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOver callback\n");
 				}
-			}
-		} else {
-			// If we found no intersection and we weren't hovering on it before, move on
-			if (!model->isHovered) {
-				continue;
-			}
-			// Otherwise, we've just hovered off of it, so mark that
-			model->isHovered = false;
-			// If we have no callback, bail early
-			if (model->onHoverOut.empty()) {
-				continue;
-			}
-			// Call the onHoverOut callback
-			{
-				JSAutoCompartment ac(cx, global);
+			} else {
+				// If we found no intersection and we weren't hovering on it before, move on
+				if (!model->isHovered) {
+					continue;
+				}
+				// Otherwise, we've just hovered off of it, so mark that
+				model->isHovered = false;
+				// If we have no callback, bail early
+				if (model->onHoverOut.empty()) {
+					continue;
+				}
+				// Call the onHoverOut callback
 				JS::RootedValue callback(cx, model->onHoverOut.ref());
-				JS::RootedValue rval(cx);
 				if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
 					__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOut callback\n");
 				}

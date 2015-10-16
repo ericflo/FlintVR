@@ -121,6 +121,27 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   // Go ahead and create our self object
   JS::RootedObject self(cx, NewCoreModel(cx, model));
 
+  // Pull out the onFrame callback if we find one
+  JS::RootedValue onFrameVal(cx);
+  if (JS_GetProperty(cx, opts, "onFrame", &onFrameVal) &&
+      !onFrameVal.isNullOrUndefined()) {
+    if (!onFrameVal.isObject()) {
+      JS_ReportError(cx, "onFrame callback is expected to be a function");
+      return false;
+    }
+    JS::RootedObject onFrameObj(cx, &onFrameVal.toObject());
+    if (!JS_ObjectIsFunction(cx, onFrameObj)) {
+      JS_ReportError(cx, "onFrame callback is expected to be a function");
+      return false;
+    }
+    // Make sure 'this' refers to the model in JS
+    JS::RootedObject boundOnFrameObj(cx, JS_BindCallable(cx, onFrameObj, self));
+    // Persist the callback in our data structure
+    JS::PersistentRootedValue onFrame(cx, JS::ObjectOrNullValue(boundOnFrameObj));
+    model->onFrame.destroyIfConstructed();
+    model->onFrame.construct(cx, onFrame);
+  }
+
   // Pull out the onHoverOver callback if we find one
   JS::RootedValue onHoverOverVal(cx);
   if (JS_GetProperty(cx, opts, "onHoverOver", &onHoverOverVal) &&
@@ -192,6 +213,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   Model* model = (Model*)JS_GetPrivate(obj);
   JS_SetPrivate(obj, NULL);
+  model->onFrame.destroyIfConstructed();
   model->onHoverOver.destroyIfConstructed();
   model->onHoverOut.destroyIfConstructed();
   // TODO: Figure out what to do about ownership of this value and whether to free it
