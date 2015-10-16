@@ -1,0 +1,5 @@
+Projects/Android/bin/*
+Projects/Android/gen/*
+Projects/Android/obj/*
+Projects/Android/libs/*
+assets/oculussig_*
