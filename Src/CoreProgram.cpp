@@ -59,8 +59,8 @@ bool CoreProgram_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	}
 
 	// Copy the vertex and fragment shaders into C string buffers whose memory we control
-	size_t vertexLen = JS_GetStringLength(vertex) * sizeof(char);
-	char* vertexBuf = new char[vertexLen];
+	size_t vertexLen = JS_GetStringEncodingLength(cx, vertex) * sizeof(char);
+	char* vertexBuf = new char[vertexLen+1];
 	size_t vertexCopiedLen = JS_EncodeStringToBuffer(cx, vertex, vertexBuf, vertexLen);
 	if (vertexCopiedLen != vertexLen) {
 		delete[] vertexBuf;
@@ -68,9 +68,10 @@ bool CoreProgram_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 		JS_ReportError(cx, "Could not encode vertex string to program buffer");
 		return false;
 	}
+	vertexBuf[vertexLen] = '\0';
 
-	size_t fragmentLen = JS_GetStringLength(fragment) * sizeof(char);
-	char* fragmentBuf = new char[fragmentLen];
+	size_t fragmentLen = JS_GetStringEncodingLength(cx, fragment) * sizeof(char);
+	char* fragmentBuf = new char[fragmentLen+1];
 	size_t fragmentCopiedLen = JS_EncodeStringToBuffer(cx, fragment, fragmentBuf, fragmentLen);
 	if (fragmentCopiedLen != fragmentLen) {
 		delete[] vertexBuf;
@@ -79,6 +80,7 @@ bool CoreProgram_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 		JS_ReportError(cx, "Could not encode fragment string to program buffer");
 		return false;
 	}
+	fragmentBuf[fragmentLen] = '\0';
 
 	// Create the actual program from these C string buffers
 	OVR::GlProgram program = OVR::BuildProgram(vertexBuf, fragmentBuf);
