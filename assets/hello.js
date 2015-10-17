@@ -130,37 +130,35 @@ function vrmain(env) {
           ),
           rotation: Vector3f(0, 0, 0),
           scale: Vector3f(1, 1, 1),
-          onFrame: function(ts) {
+          onFrame: function(ev) {
             if (!this._start) {
-              this._start = ts;
+              this._start = ev.now;
             }
             if (this._touchdown) {
               return;
             }
-            var secondsElapsed = (ts - this._start); // Seconds
+            var secondsElapsed = (ev.now - this._start); // Seconds
             this.rotation.x = secondsElapsed;
             this.rotation.y = secondsElapsed * 0.8;
           },
-          onHoverOver: function() {
+          onHoverOver: function(ev) {
             this.scale.x = 1.4;
             this.scale.y = 1.4;
             this.scale.z = 1.4;
           },
-          onHoverOut: function() {
+          onHoverOut: function(ev) {
             this.scale.x = 1;
             this.scale.y = 1;
             this.scale.z = 1;
           },
-          onGestureTouchDown: function() {
+          onGestureTouchDown: function(ev) {
             this._touchdown = true;
-            this.rotation.x = 0;
-            this.rotation.y = 0;
           },
-          onGestureTouchUp: function() {
+          onGestureTouchUp: function(ev) {
             this._touchdown = false;
             env.scene.remove(this);
           },
-          onGestureTouchCancel: function() {
+          onGestureTouchCancel: function(ev) {
             this._touchdown = false;
           }
         });
@@ -168,4 +166,21 @@ function vrmain(env) {
       }
     }
   }
+
+  /////// CURSOR //////////
+  var cursor = Model({
+    geometry: cubeGeometry,
+    program: program,
+    position: Vector3f(0, 0, 0),
+    rotation: Vector3f(0, 0, 0),
+    scale: Vector3f(0.05, 0.05, 0.05),
+    onFrame: function(ev) {
+      var pos = ev.viewPos.add(ev.viewFwd.multiply(5));
+      // TODO: Make this not necessary
+      this.position.x = pos.x;
+      this.position.y = pos.y;
+      this.position.z = pos.z;
+    }
+  });
+  env.scene.add(cursor);
 }

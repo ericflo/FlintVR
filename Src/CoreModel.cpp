@@ -10,6 +10,30 @@ int GetNextModelId() {
   return CURRENT_MODEL_ID++;
 }
 
+void ComputeModelMatrix(Model* model) {
+  OVR::Matrix4f matrix;
+  if (model->matrix != NULL) {
+    matrix = *(model->matrix);
+  }
+  if (model->rotation != NULL) {
+    matrix *= (
+      OVR::Matrix4f::RotationX(model->rotation->x) *
+      OVR::Matrix4f::RotationY(model->rotation->y) *
+      OVR::Matrix4f::RotationZ(model->rotation->z)
+    );
+  }
+  if (model->scale != NULL) {
+    matrix *= OVR::Matrix4f::Scaling(*(model->scale));
+  }
+  if (model->position != NULL) {
+    matrix.SetTranslation(*(model->position));
+  }
+  if (model->computedMatrix != NULL) {
+    delete model->computedMatrix;
+  }
+  model->computedMatrix = new OVR::Matrix4f(matrix);
+}
+
 static JSClass coreModelClass = {
   "Model",                /* name */
   JSCLASS_HAS_PRIVATE,    /* flags */
@@ -82,8 +106,8 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 
   // Get a reference to the position vector
   JS::RootedValue positionVal(cx);
-  OVR::Vector3f* position;
-  if (JS_GetProperty(cx, opts, "position", &positionVal)) {
+  OVR::Vector3f* position = NULL;
+  if (JS_GetProperty(cx, opts, "position", &positionVal) && !positionVal.isNullOrUndefined()) {
     // TODO: Error handling (attn: security)
     JS::RootedObject positionObj(cx, &positionVal.toObject());
     position = GetVector3f(positionObj);
@@ -92,8 +116,8 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 
   // Get a reference to the rotation vector
   JS::RootedValue rotationVal(cx);
-  OVR::Vector3f* rotation;
-  if (JS_GetProperty(cx, opts, "rotation", &rotationVal)) {
+  OVR::Vector3f* rotation = NULL;
+  if (JS_GetProperty(cx, opts, "rotation", &rotationVal) && !rotationVal.isNullOrUndefined()) {
     // TODO: Error handling (attn: security)
     JS::RootedObject rotateObj(cx, &rotationVal.toObject());
     rotation = GetVector3f(rotateObj);
@@ -102,18 +126,28 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 
   // Get a reference to the scale vector
   JS::RootedValue scaleVal(cx);
-  OVR::Vector3f* scale;
-  if (JS_GetProperty(cx, opts, "scale", &scaleVal)) {
+  OVR::Vector3f* scale = NULL;
+  if (JS_GetProperty(cx, opts, "scale", &scaleVal) && !scaleVal.isNullOrUndefined()) {
     // TODO: Error handling (attn: security)
     JS::RootedObject rotateObj(cx, &scaleVal.toObject());
     scale = GetVector3f(rotateObj);
   }
   // TODO: Else clause on this
 
+  // Get a reference to the transform matrix
+  JS::RootedValue matrixVal(cx);
+  OVR::Matrix4f* matrix = NULL;
+  if (JS_GetProperty(cx, opts, "transform", &matrixVal) && !matrixVal.isNullOrUndefined()) {
+    // TODO: Error handling (attn: security)
+    JS::RootedObject matrixObj(cx, &matrixVal.toObject());
+    matrix = GetMatrix4f(matrixObj);
+  }
+
   Model* model = new Model;
   model->id = GetNextModelId();
   model->geometry = GetGeometry(geometryObj);
   model->program = GetProgram(programObj);
+  model->matrix = matrix;
   model->position = position;
   model->rotation = rotation;
   model->scale = scale;
@@ -282,6 +316,7 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   model->onGestureTouchDown.destroyIfConstructed();
   model->onGestureTouchUp.destroyIfConstructed();
   model->onGestureTouchCancel.destroyIfConstructed();
+  delete model->computedMatrix;
   // TODO: Figure out what to do about ownership of this value and whether to free it
   delete model;
 }

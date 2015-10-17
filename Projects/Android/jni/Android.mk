@@ -9,7 +9,7 @@ include ../../../../../cflags.mk
 
 LOCAL_MODULE			:= vrcubeworld
 LOCAL_SRC_FILES			:= ../../../Src/VrCubeWorld_Framework.cpp ../../../Src/CoreGeometry.cpp ../../../Src/CoreProgram.cpp ../../../Src/CoreScene.cpp ../../../Src/CoreVector3f.cpp ../../../Src/CoreVector4f.cpp ../../../Src/ParseVertexAttribs.cpp ../../../Src/SceneGraph.cpp ../../../Src/CoreModel.cpp ../../../Src/CoreMatrix4f.cpp
-LOCAL_STATIC_LIBRARIES	+= vrsound vrlocale vrgui vrappframework libovrkernel spidermonkey_static
+LOCAL_STATIC_LIBRARIES	+= vrsound vrlocale vrgui vrappframework libovrkernel spidermonkey_static bullet_static
 LOCAL_SHARED_LIBRARIES	+= vrapi libandroid
 LOCAL_LDLIBS            += -landroid
 
@@ -22,3 +22,4 @@ $(call import-module,VrAppSupport/VrGui/Projects/Android/jni)
 $(call import-module,VrAppSupport/VrLocale/Projects/Android/jni)
 $(call import-module,VrAppSupport/VrSound/Projects/Android/jni)
 $(call import-module,VrSamples/Native/spidermonkey/prebuilt/android)
+$(call import-module,VrSamples/Native/bullet)

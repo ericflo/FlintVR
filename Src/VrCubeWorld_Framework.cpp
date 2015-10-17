@@ -28,6 +28,9 @@ Copyright	:	Copyright 2015 Oculus VR, LLC. All Rights reserved.
 #include "CoreModel.h"
 #include "CoreScene.h"
 #include "SceneGraph.h"
+#include "bullet/btBulletCollisionCommon.h"
+
+inline int bullet_btInfinityMask(){ return btInfinityMask; } // Hack to work around bullet bug
 
 #if 0
 	#define GL( func )		func; EglCheckErrors();
@@ -269,35 +272,45 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 	{
 		JSAutoCompartment ac(cx, global);
 
-		// Build the env
-		JS::RootedObject env(cx, JS_NewObject(cx, nullptr, JS::NullPtr(), JS::NullPtr()));
+		// Build the ev
+		JS::RootedObject ev(cx, JS_NewObject(cx, nullptr, JS::NullPtr(), JS::NullPtr()));
 		JS::RootedValue viewPosVal(cx, JS::ObjectOrNullValue(NewCoreVector3f(cx, viewPos)));
-		if (!JS_SetProperty(cx, env, "viewPos", viewPosVal)) {
-			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not set env.viewPos\n");
-			JS_ReportError(cx, "Could not set env.viewPos");
+		if (!JS_SetProperty(cx, ev, "viewPos", viewPosVal)) {
+			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not set ev.viewPos\n");
+			JS_ReportError(cx, "Could not set ev.viewPos");
 			return CenterEyeViewMatrix;
 		}
 		JS::RootedValue viewFwdVal(cx, JS::ObjectOrNullValue(NewCoreVector3f(cx, viewFwd)));
-		if (!JS_SetProperty(cx, env, "viewFwd", viewFwdVal)) {
-			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not set env.viewFwd\n");
-			JS_ReportError(cx, "Could not set env.viewFwd");
+		if (!JS_SetProperty(cx, ev, "viewFwd", viewFwdVal)) {
+			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not set ev.viewFwd\n");
+			JS_ReportError(cx, "Could not set ev.viewFwd");
 			return CenterEyeViewMatrix;
 		}
-		JS::RootedValue envValue(cx, JS::ObjectOrNullValue(env));
+		JS::RootedValue nowVal(cx, JS::NumberValue(vrapi_GetTimeInSeconds()));
+		if (!JS_SetProperty(cx, ev, "now", nowVal)) {
+			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not set ev.now\n");
+			JS_ReportError(cx, "Could not set ev.now");
+			return CenterEyeViewMatrix;
+		}
+		JS::RootedValue evValue(cx, JS::ObjectOrNullValue(ev));
 
 		// We're gonna have some rvals going on in here, guess we'll make one for reference
 		JS::RootedValue rval(cx);
 
+		// Compute each model's transform matrix
+		for (int i = 0; i < coreScene->graph->count(); ++i) {
+			Model* model = coreScene->graph->at(i);
+			ComputeModelMatrix(model);
+		}
+
 		// Call the frame callbacks
-		double now = vrapi_GetTimeInSeconds();
-		JS::RootedValue nowVal(cx, JS::NumberValue(now));
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
 			Model* model = coreScene->graph->at(i);
 			if (model->onFrame.empty()) {
 				continue;
 			}
 			JS::RootedValue callback(cx, model->onFrame.ref());
-			if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(nowVal), &rval)) {
+			if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
 				__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onFrame callback\n");
 			}
 		}
@@ -309,21 +322,13 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 				continue;
 			}
 
-			// Set up model matrix
-			OVR::Matrix4f matrix = (
-					OVR::Matrix4f::RotationX(model->rotation->x) *
-					OVR::Matrix4f::RotationY(model->rotation->y) *
-					OVR::Matrix4f::RotationZ(model->rotation->z)
-			) * OVR::Matrix4f::Scaling(*(model->scale));
-			matrix.SetTranslation(*(model->position));
-
 			// Check for an intersection of one of the triangles of the model
 			bool foundIntersection = false;
 			OVR::Array<OVR::Vector3f> vertices = model->geometry->vertices->position;
 			for (int j = 0; j < model->geometry->indices.GetSizeI(); j += 3) {
-				OVR::Vector3f v0 = matrix.Transform(vertices[model->geometry->indices[j]]);
-				OVR::Vector3f v1 = matrix.Transform(vertices[model->geometry->indices[j + 1]]);
-				OVR::Vector3f v2 = matrix.Transform(vertices[model->geometry->indices[j + 2]]);
+				OVR::Vector3f v0 = model->computedMatrix->Transform(vertices[model->geometry->indices[j]]);
+				OVR::Vector3f v1 = model->computedMatrix->Transform(vertices[model->geometry->indices[j + 1]]);
+				OVR::Vector3f v2 = model->computedMatrix->Transform(vertices[model->geometry->indices[j + 2]]);
 				float t0, u, v;
 				if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
 					foundIntersection = true;
@@ -341,8 +346,8 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 					// Call the onHoverOver callback
 					if (!model->onHoverOver.empty()) {
 						callback = JS::RootedValue(cx, model->onHoverOver.ref());
-						// TODO: Construct an object (with t0, u, v ?) to pass in
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+						// TODO: Construct an object (with t0, u, v ?) to add to env
+						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
 							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOver callback\n");
 						}
 					}
@@ -350,10 +355,10 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 				if (!model->isTouching && touchPressed) {
 					model->isTouching = true;
-					// TODO: Construct an object (with t0, u, v ?) to pass in
+					// TODO: Construct an object (with t0, u, v ?) to add to env
 					if (!model->onGestureTouchDown.empty()) {
 						callback = JS::RootedValue(cx, model->onGestureTouchDown.ref());
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
 							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchDown callback\n");
 						}
 					}
@@ -361,10 +366,10 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 				if (model->isTouching && touchReleased) {
 					model->isTouching = false;
-					// TODO: Construct an object (with t0, u, v ?) to pass in
+					// TODO: Construct an object (with t0, u, v ?) to add to env
 					if (!model->onGestureTouchUp.empty()) {
 						callback = JS::RootedValue(cx, model->onGestureTouchUp.ref());
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
 							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchUp callback\n");
 						}
 					}
@@ -382,7 +387,7 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 					model->isTouching = false;
 					if (!model->onGestureTouchCancel.empty()) {
 						callback = JS::RootedValue(cx, model->onGestureTouchCancel.ref());
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
 							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchCancel callback\n");
 						}
 					}
@@ -391,7 +396,7 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 				// Call the onHoverOut callback
 				if (!model->onHoverOut.empty()) {
 					callback = JS::RootedValue(cx, model->onHoverOut.ref());
-					if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray::empty(), &rval)) {
+					if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
 						__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOut callback\n");
 					}
 				}
@@ -425,17 +430,9 @@ Matrix4f VrCubeWorld::DrawEyeView( const int eye, const float fovDegreesX, const
 			continue;
 		}
 
-		// Set up model matrix
-		OVR::Matrix4f matrix = (
-				OVR::Matrix4f::RotationX(model->rotation->x) *
-				OVR::Matrix4f::RotationY(model->rotation->y) *
-				OVR::Matrix4f::RotationZ(model->rotation->z)
-		) * OVR::Matrix4f::Scaling(*(model->scale));
-		matrix.SetTranslation(*(model->position));
-
 		// Now submit the draw calls
 		GL( glUseProgram( model->program->program ) );
-		GL( glUniformMatrix4fv( model->program->uModel, 1, GL_TRUE, matrix.M[0] ) );
+		GL( glUniformMatrix4fv( model->program->uModel, 1, GL_TRUE, model->computedMatrix->M[0] ) );
 		GL( glUniformMatrix4fv( model->program->uView, 1, GL_TRUE, eyeViewMatrix.M[0] ) );
 		GL( glUniformMatrix4fv( model->program->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0] ) );
 		GL( glBindVertexArray( model->geometry->geometry->vertexArrayObject ) );
