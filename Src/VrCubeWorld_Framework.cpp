@@ -334,6 +334,11 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 					foundIntersection = true;
 					break;
 				}
+				// Check the backface (is this necessary?)
+				if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v2, v1, v0, t0, u, v)) {
+					foundIntersection = true;
+					break;
+				}
 			}
 
 			JS::RootedValue callback(cx);
