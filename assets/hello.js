@@ -168,12 +168,30 @@ function vrmain(env) {
   }
 
   /////// CURSOR //////////
+  var darkProgram = Program((
+    '#version 300 es\n'+
+    'in vec3 Position;\n'+
+    'uniform mat4 Modelm;\n'+
+    'uniform mat4 Viewm;\n'+
+    'uniform mat4 Projectionm;\n'+
+    'void main()\n'+
+    '{\n'+
+    ' gl_Position = Projectionm * ( Viewm * ( Modelm * vec4( Position, 1.0 ) ) );\n'+
+    '}'
+  ), (
+    '#version 300 es\n'+
+    'out lowp vec4 outColor;\n'+
+    'void main()\n'+
+    '{\n'+
+    ' outColor = vec4(0.0, 0.0, 0.0, 1.0);\n'+
+    '}'
+  ));
   var cursor = Model({
     geometry: cubeGeometry,
-    program: program,
+    program: darkProgram,
     position: Vector3f(0, 0, 0),
     rotation: Vector3f(0, 0, 0),
-    scale: Vector3f(0.05, 0.05, 0.05),
+    scale: Vector3f(0.02, 0.02, 0.02),
     onFrame: function(ev) {
       var pos = ev.viewPos.add(ev.viewFwd.multiply(5));
       // TODO: Make this not necessary
