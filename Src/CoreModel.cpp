@@ -289,6 +289,10 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     JS_ReportError(cx, "Could not set program property on model object");
     return false;
   }
+  if (!JS_SetProperty(cx, self, "transform", matrixVal)) {
+    JS_ReportError(cx, "Could not set transform property on model object");
+    return false;
+  }
   if (!JS_SetProperty(cx, self, "position", positionVal)) {
     JS_ReportError(cx, "Could not set position property on model object");
     return false;
