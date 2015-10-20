@@ -10,7 +10,7 @@ int GetNextModelId() {
   return CURRENT_MODEL_ID++;
 }
 
-void ComputeModelMatrix(Model* model) {
+void ComputeModelMatrix(CoreModel* model) {
   OVR::Matrix4f matrix;
   if (model->matrix != NULL) {
     matrix = *(model->matrix);
@@ -51,14 +51,14 @@ static JSClass coreModelClass = {
   NULL                    /* trace       (JSTraceOp) */
 };
 
-JSObject* NewCoreModel(JSContext *cx, Model* model) {
+JSObject* NewCoreModel(JSContext *cx, CoreModel* model) {
   JS::RootedObject self(cx, JS_NewObject(cx, &coreModelClass, JS::NullPtr(), JS::NullPtr()));
   JS_SetPrivate(self, (void *)model);
   return self;
 }
 
-Model* GetCoreModel(JS::HandleObject obj) {
-  Model* model = (Model*)JS_GetPrivate(obj);
+CoreModel* GetCoreModel(JS::HandleObject obj) {
+  CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
   return model;
 }
 
@@ -143,7 +143,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     matrix = GetMatrix4f(matrixObj);
   }
 
-  Model* model = new Model;
+  CoreModel* model = new CoreModel;
   model->id = GetNextModelId();
   model->geometry = GetGeometry(geometryObj);
   model->program = GetProgram(programObj);
@@ -312,7 +312,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 }
 
 void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
-  Model* model = (Model*)JS_GetPrivate(obj);
+  CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
   JS_SetPrivate(obj, NULL);
   model->onFrame.destroyIfConstructed();
   model->onHoverOver.destroyIfConstructed();

@@ -7,14 +7,14 @@ class SceneGraph {
 public:
 	SceneGraph();
 	int count();
-	void add(Model* node);
-  int indexOf(Model* node);
+	void add(CoreModel* node);
+  int indexOf(CoreModel* node);
   void remove(int i);
-	Model* at(int i);
+	CoreModel* at(int i);
 	void reclaim();
 private:
 	void resize();
-	Model** objects;
+	CoreModel** objects;
 	int _count;
 	int _capacity;
 };

@@ -299,13 +299,13 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 		// Compute each model's transform matrix
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
-			Model* model = coreScene->graph->at(i);
+			CoreModel* model = coreScene->graph->at(i);
 			ComputeModelMatrix(model);
 		}
 
 		// Call the frame callbacks
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
-			Model* model = coreScene->graph->at(i);
+			CoreModel* model = coreScene->graph->at(i);
 			if (model->onFrame.empty()) {
 				continue;
 			}
@@ -317,7 +317,7 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 		// Call hover and collision callbacks
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
-			Model* model = coreScene->graph->at(i);
+			CoreModel* model = coreScene->graph->at(i);
 			if (model->onHoverOver.empty() && model->onHoverOut.empty() &&
 				  model->onGestureTouchDown.empty() && model->onGestureTouchUp.empty() &&
 				  model->onGestureTouchCancel.empty()) {
@@ -432,7 +432,7 @@ Matrix4f VrCubeWorld::DrawEyeView( const int eye, const float fovDegreesX, const
 	GL( glClear( GL_COLOR_BUFFER_BIT ) );
 
 	for (int i = 0; i < coreScene->graph->count(); ++i) {
-		Model* model = coreScene->graph->at(i);
+		CoreModel* model = coreScene->graph->at(i);
 		if (model == NULL) {
 			continue;
 		}

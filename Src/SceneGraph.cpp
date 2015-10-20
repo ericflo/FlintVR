@@ -8,14 +8,14 @@ int SceneGraph::count() {
 	return _count;
 }
 
-void SceneGraph::add(Model* node) {
+void SceneGraph::add(CoreModel* node) {
 	if (_count == _capacity) {
 		resize();
 	}
 	objects[_count++] = node;
 }
 
-int SceneGraph::indexOf(Model* node) {
+int SceneGraph::indexOf(CoreModel* node) {
   for (int i = 0; i < _count; ++i) {
     if (objects[i]->id == node->id) {
       return i;
@@ -38,7 +38,7 @@ void SceneGraph::resize() {
   } else {
     nextCapacity = _capacity * 2;
   }
-  Model** nextObjects = new Model*[nextCapacity];
+  CoreModel** nextObjects = new CoreModel*[nextCapacity];
   for (int i = 0; i < _count; ++i) {
     nextObjects[i] = objects[i];
     objects[i] = NULL;
@@ -50,7 +50,7 @@ void SceneGraph::resize() {
   _capacity = nextCapacity;
 }
 
-Model* SceneGraph::at(int i) {
+CoreModel* SceneGraph::at(int i) {
 	return objects[i];
 }
 

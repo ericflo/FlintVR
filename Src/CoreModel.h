@@ -7,7 +7,8 @@
 #include "CoreVector3f.h"
 #include "CoreMatrix4f.h"
 
-typedef struct Model {
+class CoreModel {
+public:
 	int id;
 	CoreGeometry* geometry;
 	OVR::GlProgram* program;
@@ -24,13 +25,13 @@ typedef struct Model {
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancel;
 	bool isHovered;
   bool isTouching;
-} Model;
+};
 
 int GetNextModelId();
-void ComputeModelMatrix(Model* model);
+void ComputeModelMatrix(CoreModel* model);
 
 void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);
-JSObject* NewCoreModel(JSContext *cx, Model* model);
-Model* GetCoreModel(JS::HandleObject obj);
+JSObject* NewCoreModel(JSContext *cx, CoreModel* model);
+CoreModel* GetCoreModel(JS::HandleObject obj);
 
 #endif
