@@ -10,6 +10,37 @@ int GetNextModelId() {
   return CURRENT_MODEL_ID++;
 }
 
+CoreGeometry* CoreModel::geometry(JSContext *cx) {
+  if (geometryVal.empty()) {
+    return NULL;
+  }
+  JS::RootedValue val(cx, geometryVal.ref());
+  JS::RootedObject obj(cx, &val.toObject());
+  return GetGeometry(obj);
+}
+
+bool _setPersistentVal(JSContext *cx, JS::MutableHandleValue vp, mozilla::Maybe<JS::PersistentRootedValue>* out) {
+  JS::PersistentRootedValue persistentVal(cx, vp);
+  out->destroyIfConstructed();
+  out->construct(cx, persistentVal);
+  return true;
+}
+
+bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
+  if (!vp.isObject()) {
+    JS_ReportError(cx, "Unexpected argument (expected object)");
+    return false;
+  }
+  return true;
+}
+
+bool _ensureGeometry(JSContext *cx, JS::MutableHandleValue vp) {
+  if (!_ensureObject(cx, vp)) {
+    return false;
+  }
+  return true;
+}
+
 void ComputeModelMatrix(CoreModel* model) {
   OVR::Matrix4f matrix;
   if (model->matrix != NULL) {
@@ -30,6 +61,7 @@ void ComputeModelMatrix(CoreModel* model) {
   }
   if (model->computedMatrix != NULL) {
     delete model->computedMatrix;
+    model->computedMatrix = NULL;
   }
   model->computedMatrix = new OVR::Matrix4f(matrix);
 }
@@ -78,18 +110,20 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   }
   JS::RootedObject opts(cx, &args[0].toObject());
 
+  CoreModel m;
+
   // Get a reference to the GlGeometry from the opts object
   JS::RootedValue geometry(cx);
   if (!JS_GetProperty(cx, opts, "geometry", &geometry)) {
     JS_ReportError(cx, "Could not find 'geometry' option");
     return false;
   }
-  if (!geometry.isObject()) {
-    JS_ReportError(cx, "Expected geometry to be an object");
+  if (!_ensureGeometry(cx, &geometry)) {
     return false;
   }
-  // TODO: Validate object type before casting
-  JS::RootedObject geometryObj(cx, &geometry.toObject());
+  if (!_setPersistentVal(cx, &geometry, &m.geometryVal)) {
+    return false;
+  }
 
   // Get a reference to the GlProgram from the opts object
   JS::RootedValue program(cx);
@@ -145,7 +179,8 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 
   CoreModel* model = new CoreModel;
   model->id = GetNextModelId();
-  model->geometry = GetGeometry(geometryObj);
+  _setPersistentVal(cx, &m.geometryVal.ref(), &model->geometryVal);
+  //model->geometryVal.construct(m.geometryVal.ref());
   model->program = GetProgram(programObj);
   model->matrix = matrix;
   model->position = position;
@@ -311,9 +346,44 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
+bool _jsStrEq(JSContext *cx, JS::RootedString* first, const char* second, bool *match) {
+  if (!JS_StringEqualsAscii(cx, *first, second, match)) {
+    JS_ReportError(cx, "Could not compare strings");
+    return false;
+  }
+  return true;
+}
+
+bool CoreModel_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool strict, JS::MutableHandleValue vp) {
+  if (!JSID_IS_STRING(id)) {
+    return true;
+  }
+
+  JS::RootedString propertyName(cx, JSID_TO_STRING(id));
+  CoreModel* model = GetCoreModel(obj);
+
+  // Geometry property
+  bool match;
+  if (!_jsStrEq(cx, &propertyName, "geometry", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureGeometry(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->geometryVal);
+  }
+
+  return true;
+}
+
+bool CoreModel_getProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp) {
+  return JS_PropertyStub(cx, obj, id, vp);
+}
+
 void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
   JS_SetPrivate(obj, NULL);
+  model->geometryVal.destroyIfConstructed();
   model->onFrame.destroyIfConstructed();
   model->onHoverOver.destroyIfConstructed();
   model->onHoverOut.destroyIfConstructed();
@@ -327,6 +397,8 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
 
 void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core) {
   coreModelClass.finalize = CoreModel_finalize;
+  coreModelClass.getProperty = CoreModel_getProperty;
+  coreModelClass.setProperty = CoreModel_setProperty;
   JSObject *obj = JS_InitClass(
       cx,
       *core,

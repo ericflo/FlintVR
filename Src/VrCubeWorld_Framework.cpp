@@ -294,6 +294,7 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 		}
 		JS::RootedValue evValue(cx, JS::ObjectOrNullValue(ev));
 
+
 		// We're gonna have some rvals going on in here, guess we'll make one for reference
 		JS::RootedValue rval(cx);
 
@@ -326,11 +327,11 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 			// Check for an intersection of one of the triangles of the model
 			bool foundIntersection = false;
-			OVR::Array<OVR::Vector3f> vertices = model->geometry->vertices->position;
-			for (int j = 0; j < model->geometry->indices.GetSizeI(); j += 3) {
-				OVR::Vector3f v0 = model->computedMatrix->Transform(vertices[model->geometry->indices[j]]);
-				OVR::Vector3f v1 = model->computedMatrix->Transform(vertices[model->geometry->indices[j + 1]]);
-				OVR::Vector3f v2 = model->computedMatrix->Transform(vertices[model->geometry->indices[j + 2]]);
+			OVR::Array<OVR::Vector3f> vertices = model->geometry(cx)->vertices->position;
+			for (int j = 0; j < model->geometry(cx)->indices.GetSizeI(); j += 3) {
+				OVR::Vector3f v0 = model->computedMatrix->Transform(vertices[model->geometry(cx)->indices[j]]);
+				OVR::Vector3f v1 = model->computedMatrix->Transform(vertices[model->geometry(cx)->indices[j + 1]]);
+				OVR::Vector3f v2 = model->computedMatrix->Transform(vertices[model->geometry(cx)->indices[j + 2]]);
 				float t0, u, v;
 				if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
 					foundIntersection = true;
@@ -423,31 +424,39 @@ Matrix4f VrCubeWorld::DrawEyeView( const int eye, const float fovDegreesX, const
 	const Matrix4f eyeProjectionMatrix = ovrMatrix4f_CreateProjectionFov( fovDegreesX, fovDegreesY, 0.0f, 0.0f, 0.2f, 0.0f );
 	const Matrix4f eyeViewProjection = eyeProjectionMatrix * eyeViewMatrix;
 
-	GL( glClearColor(
-		coreScene->clearColor->x,
-		coreScene->clearColor->y,
-		coreScene->clearColor->z,
-		coreScene->clearColor->w
-	) );
-	GL( glClear( GL_COLOR_BUFFER_BIT ) );
+	// Call the function returned from vrmain
+	JSContext *cx = SpidermonkeyJSContext;
 
-	for (int i = 0; i < coreScene->graph->count(); ++i) {
-		CoreModel* model = coreScene->graph->at(i);
-		if (model == NULL) {
-			continue;
+	JS::RootedObject global(cx, SpidermonkeyGlobal.ref());
+	{
+		JSAutoCompartment ac(cx, global);
+
+		GL( glClearColor(
+			coreScene->clearColor->x,
+			coreScene->clearColor->y,
+			coreScene->clearColor->z,
+			coreScene->clearColor->w
+		) );
+		GL( glClear( GL_COLOR_BUFFER_BIT ) );
+
+		for (int i = 0; i < coreScene->graph->count(); ++i) {
+			CoreModel* model = coreScene->graph->at(i);
+			if (model == NULL) {
+				continue;
+			}
+
+			// Now submit the draw calls
+			GL( glUseProgram( model->program->program ) );
+			GL( glUniformMatrix4fv( model->program->uModel, 1, GL_TRUE, model->computedMatrix->M[0] ) );
+			GL( glUniformMatrix4fv( model->program->uView, 1, GL_TRUE, eyeViewMatrix.M[0] ) );
+			GL( glUniformMatrix4fv( model->program->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0] ) );
+			GL( glBindVertexArray( model->geometry(cx)->geometry->vertexArrayObject ) );
+			GL( glDrawElements( GL_TRIANGLES, model->geometry(cx)->geometry->indexCount, GL_UNSIGNED_SHORT, NULL ) );
 		}
 
-		// Now submit the draw calls
-		GL( glUseProgram( model->program->program ) );
-		GL( glUniformMatrix4fv( model->program->uModel, 1, GL_TRUE, model->computedMatrix->M[0] ) );
-		GL( glUniformMatrix4fv( model->program->uView, 1, GL_TRUE, eyeViewMatrix.M[0] ) );
-		GL( glUniformMatrix4fv( model->program->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0] ) );
-		GL( glBindVertexArray( model->geometry->geometry->vertexArrayObject ) );
-		GL( glDrawElements( GL_TRIANGLES, model->geometry->geometry->indexCount, GL_UNSIGNED_SHORT, NULL ) );
+		GL( glBindVertexArray( 0 ) );
+		GL( glUseProgram( 0 ) );
 	}
-
-	GL( glBindVertexArray( 0 ) );
-	GL( glUseProgram( 0 ) );
 
 	GuiSys->RenderEyeView( CenterEyeViewMatrix, eyeViewProjection );
 

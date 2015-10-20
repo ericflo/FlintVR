@@ -10,13 +10,15 @@
 class CoreModel {
 public:
 	int id;
-	CoreGeometry* geometry;
+  CoreGeometry* geometry(JSContext *cx);
+
+  mozilla::Maybe<JS::PersistentRootedValue> geometryVal;
 	OVR::GlProgram* program;
   OVR::Matrix4f* matrix;
 	OVR::Vector3f* position;
 	OVR::Vector3f* rotation;
 	OVR::Vector3f* scale;
-  OVR::Matrix4f* computedMatrix;
+  OVR::Matrix4f* computedMatrix = NULL;
   mozilla::Maybe<JS::PersistentRootedValue> onFrame;
 	mozilla::Maybe<JS::PersistentRootedValue> onHoverOver;
 	mozilla::Maybe<JS::PersistentRootedValue> onHoverOut;
