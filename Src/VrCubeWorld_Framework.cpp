@@ -165,7 +165,8 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 	JS_Init();
 
 	// Set up the JS runtime and context
-	SpidermonkeyJSRuntime = JS_NewRuntime(32L * 1024 * 1024); // Garbage collect at 32MB
+	//SpidermonkeyJSRuntime = JS_NewRuntime(32L * 1024 * 1024); // Garbage collect at 32MB
+	SpidermonkeyJSRuntime = JS_NewRuntime(512L * 1024); // Garbage collect at 512KB
 	if (!SpidermonkeyJSRuntime) {
 		return;
 	}
@@ -307,10 +308,10 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 		// Call the frame callbacks
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
 			CoreModel* model = coreScene->graph->at(i);
-			if (model->onFrame.empty()) {
+			if (model->onFrameVal.empty()) {
 				continue;
 			}
-			JS::RootedValue callback(cx, model->onFrame.ref());
+			JS::RootedValue callback(cx, model->onFrameVal.ref());
 			if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
 				__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onFrame callback\n");
 			}
@@ -319,9 +320,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 		// Call hover and collision callbacks
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
 			CoreModel* model = coreScene->graph->at(i);
-			if (model->onHoverOver.empty() && model->onHoverOut.empty() &&
-				  model->onGestureTouchDown.empty() && model->onGestureTouchUp.empty() &&
-				  model->onGestureTouchCancel.empty()) {
+			if (model->onGazeHoverOverVal.empty() && model->onGazeHoverOutVal.empty() &&
+				  model->onGestureTouchDownVal.empty() && model->onGestureTouchUpVal.empty() &&
+				  model->onGestureTouchCancelVal.empty()) {
 				continue;
 			}
 
@@ -351,13 +352,12 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 				if (!model->isHovered) {
 					model->isHovered = true;
-					// Call the onHoverOver callback
-					if (!model->onHoverOver.empty()) {
-						callback = JS::RootedValue(cx, model->onHoverOver.ref());
+					// Call the onGazeHoverOver callback
+					if (!model->onGazeHoverOverVal.empty()) {
+						callback = JS::RootedValue(cx, model->onGazeHoverOverVal.ref());
 						// TODO: Construct an object (with t0, u, v ?) to add to env
 						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
-							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOver callback\n");
-							JS_ReportError(cx, "Could not call onHoverOver callback");
+							JS_ReportError(cx, "Could not call onGazeHoverOver callback");
 						}
 					}
 				}
@@ -365,10 +365,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 				if (!model->isTouching && touchPressed) {
 					model->isTouching = true;
 					// TODO: Construct an object (with t0, u, v ?) to add to env
-					if (!model->onGestureTouchDown.empty()) {
-						callback = JS::RootedValue(cx, model->onGestureTouchDown.ref());
+					if (!model->onGestureTouchDownVal.empty()) {
+						callback = JS::RootedValue(cx, model->onGestureTouchDownVal.ref());
 						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
-							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchDown callback\n");
 							JS_ReportError(cx, "Could not call onGestureTouchDown callback");
 						}
 					}
@@ -377,10 +376,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 				if ((model->isTouching && touchReleased) || (model->isTouching && !touchDown)) {
 					model->isTouching = false;
 					// TODO: Construct an object (with t0, u, v ?) to add to env
-					if (!model->onGestureTouchUp.empty()) {
-						callback = JS::RootedValue(cx, model->onGestureTouchUp.ref());
+					if (!model->onGestureTouchUpVal.empty()) {
+						callback = JS::RootedValue(cx, model->onGestureTouchUpVal.ref());
 						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
-							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchUp callback\n");
 							JS_ReportError(cx, "Could not call onGestureTouchUp callback");
 						}
 					}
@@ -389,10 +387,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 			} else {
 				if (model->isTouching) {
 					model->isTouching = false;
-					if (!model->onGestureTouchCancel.empty()) {
-						callback = JS::RootedValue(cx, model->onGestureTouchCancel.ref());
+					if (!model->onGestureTouchCancelVal.empty()) {
+						callback = JS::RootedValue(cx, model->onGestureTouchCancelVal.ref());
 						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
-							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onGestureTouchCancel callback\n");
 							JS_ReportError(cx, "Could not call onGestureTouchCancel callback");
 						}
 					}
@@ -400,11 +397,10 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 				if (model->isHovered) {
 					model->isHovered = false;
-					if (!model->onHoverOut.empty()) {
-						callback = JS::RootedValue(cx, model->onHoverOut.ref());
+					if (!model->onGazeHoverOutVal.empty()) {
+						callback = JS::RootedValue(cx, model->onGazeHoverOutVal.ref());
 						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
-							__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onHoverOut callback\n");
-							JS_ReportError(cx, "Could not call onHoverOut callback");
+							JS_ReportError(cx, "Could not call onGazeHoverOut callback");
 						}
 					}
 				}

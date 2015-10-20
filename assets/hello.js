@@ -141,12 +141,12 @@ function vrmain(env) {
             this.rotation.x = secondsElapsed;
             this.rotation.y = secondsElapsed * 0.8;
           },
-          onHoverOver: function(ev) {
+          onGazeHoverOver: function(ev) {
             this.scale.x = 1.4;
             this.scale.y = 1.4;
             this.scale.z = 1.4;
           },
-          onHoverOut: function(ev) {
+          onGazeHoverOut: function(ev) {
             this.scale.x = 1;
             this.scale.y = 1;
             this.scale.z = 1;

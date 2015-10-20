@@ -12,6 +12,7 @@ public:
 	int id;
   bool isHovered;
   bool isTouching;
+  OVR::Matrix4f* computedMatrix = NULL;
 
   CoreGeometry* geometry(JSContext *cx);
   OVR::GlProgram* program(JSContext *cx);
@@ -27,16 +28,14 @@ public:
   mozilla::Maybe<JS::PersistentRootedValue> rotationVal;
   mozilla::Maybe<JS::PersistentRootedValue> scaleVal;
 
-  void ComputeMatrix(JSContext *cx);
+  mozilla::Maybe<JS::PersistentRootedValue> onFrameVal;
+  mozilla::Maybe<JS::PersistentRootedValue> onGazeHoverOverVal;
+  mozilla::Maybe<JS::PersistentRootedValue> onGazeHoverOutVal;
+  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchDownVal;
+  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchUpVal;
+  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancelVal;
 
-  OVR::Matrix4f* computedMatrix = NULL;
-  mozilla::Maybe<JS::PersistentRootedValue> onFrame;
-	mozilla::Maybe<JS::PersistentRootedValue> onHoverOver;
-	mozilla::Maybe<JS::PersistentRootedValue> onHoverOut;
-  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchDown;
-  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchUp;
-  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancel;
-	
+  void ComputeMatrix(JSContext *cx);
 };
 
 int GetNextModelId();

@@ -12,25 +12,33 @@ int GetNextModelId() {
 
 void CoreModel::ComputeMatrix(JSContext *cx) {
   OVR::Matrix4f mtx;
-  if (matrix(cx) != NULL) {
-    mtx = *(matrix(cx));
+
+  OVR::Matrix4f* mat = matrix(cx);
+  if (mat != NULL) {
+    mtx = *mat;
   }
-  if (rotation(cx) != NULL) {
+
+  OVR::Vector3f* rot = rotation(cx);
+  if (rot != NULL) {
     mtx *= (
-      OVR::Matrix4f::RotationX(rotation(cx)->x) *
-      OVR::Matrix4f::RotationY(rotation(cx)->y) *
-      OVR::Matrix4f::RotationZ(rotation(cx)->z)
+      OVR::Matrix4f::RotationX(rot->x) *
+      OVR::Matrix4f::RotationY(rot->y) *
+      OVR::Matrix4f::RotationZ(rot->z)
     );
   }
-  if (scale(cx) != NULL) {
-    mtx *= OVR::Matrix4f::Scaling(*(scale(cx)));
+
+  OVR::Vector3f* scl = scale(cx);
+  if (scl != NULL) {
+    mtx *= OVR::Matrix4f::Scaling(*scl);
   }
-  if (position(cx) != NULL) {
-    mtx.SetTranslation(*(position(cx)));
+
+  OVR::Vector3f* pos = position(cx);
+  if (pos != NULL) {
+    mtx.SetTranslation(*pos);
   }
+
   if (computedMatrix != NULL) {
     delete computedMatrix;
-    computedMatrix = NULL;
   }
   computedMatrix = new OVR::Matrix4f(mtx);
 }
@@ -112,6 +120,39 @@ bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
   return true;
 }
 
+bool _bindFunction(JSContext* cx, JS::RootedObject* self, JS::RootedValue* funcVal) {
+  if (!funcVal->isObject()) {
+    JS_ReportError(cx, "Invalid function value");
+    return false;
+  }
+  JS::RootedObject funcObj(cx, &funcVal->toObject());
+  if (!JS_ObjectIsFunction(cx, funcObj)) {
+    JS_ReportError(cx, "Invalid function value detected");
+    return false;
+  }
+  JS::RootedObject boundFuncObj(cx, JS_BindCallable(cx, funcObj, *self));
+  funcVal->set(JS::ObjectOrNullValue(boundFuncObj));
+  return true;
+}
+
+bool _constructorCallback(JSContext *cx, JS::RootedObject* opts, const char* name, JS::RootedObject* self, mozilla::Maybe<JS::PersistentRootedValue>* out) {
+  JS::RootedValue callbackVal(cx);
+  if (!JS_GetProperty(cx, *opts, name, &callbackVal) || callbackVal.isNullOrUndefined()) {
+    callbackVal = JS::RootedValue(cx, JS::NullValue());
+  }
+  if (callbackVal.isNullOrUndefined()) {
+    out->destroyIfConstructed();
+    return true;
+  }
+  if (!_bindFunction(cx, self, &callbackVal)) {
+    return false;
+  }
+  if (!_setPersistentVal(cx, &callbackVal, out)) {
+    return false;
+  }
+  return true;
+}
+
 static JSClass coreModelClass = {
   "Model",                /* name */
   JSCLASS_HAS_PRIVATE,    /* flags */
@@ -156,18 +197,26 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   }
   JS::RootedObject opts(cx, &args[0].toObject());
 
+  // Create our self object
+  CoreModel* model = new CoreModel;
+  model->id = GetNextModelId();
+  JS::RootedObject self(cx, NewCoreModel(cx, model));
+
   CoreModel m;
 
   // Geometry
   JS::RootedValue geometry(cx);
   if (!JS_GetProperty(cx, opts, "geometry", &geometry)) {
     JS_ReportError(cx, "Could not find 'geometry' option");
+    delete model;
     return false;
   }
   if (!_ensureObject(cx, &geometry)) {
+    delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &geometry, &m.geometryVal)) {
+  if (!_setPersistentVal(cx, &geometry, &model->geometryVal)) {
+    delete model;
     return false;
   }
 
@@ -175,12 +224,15 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   JS::RootedValue program(cx);
   if (!JS_GetProperty(cx, opts, "program", &program)) {
     JS_ReportError(cx, "Could not find 'program' option");
+    delete model;
     return false;
   }
   if (!_ensureObject(cx, &program)) {
+    delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &program, &m.programVal)) {
+  if (!_setPersistentVal(cx, &program, &model->programVal)) {
+    delete model;
     return false;
   }
 
@@ -191,9 +243,11 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
       JS::ObjectOrNullValue(NewCoreMatrix4f(cx, new OVR::Matrix4f)));
   }
   if (!_ensureObject(cx, &matrix)) {
+    delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &matrix, &m.matrixVal)) {
+  if (!_setPersistentVal(cx, &matrix, &model->matrixVal)) {
+    delete model;
     return false;
   }
 
@@ -204,9 +258,11 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f)));
   }
   if (!_ensureObject(cx, &position)) {
+    delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &position, &m.positionVal)) {
+  if (!_setPersistentVal(cx, &position, &model->positionVal)) {
+    delete model;
     return false;
   }
 
@@ -217,9 +273,11 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f)));
   }
   if (!_ensureObject(cx, &rotation)) {
+    delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &rotation, &m.rotationVal)) {
+  if (!_setPersistentVal(cx, &rotation, &model->rotationVal)) {
+    delete model;
     return false;
   }
 
@@ -230,148 +288,38 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f)));
   }
   if (!_ensureObject(cx, &scale)) {
+    delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &scale, &m.scaleVal)) {
+  if (!_setPersistentVal(cx, &scale, &model->scaleVal)) {
+    delete model;
     return false;
   }
 
-  CoreModel* model = new CoreModel;
-  model->id = GetNextModelId();
-  _setPersistentVal(cx, &m.geometryVal.ref(), &model->geometryVal);
-  _setPersistentVal(cx, &m.programVal.ref(), &model->programVal);
-  _setPersistentVal(cx, &m.matrixVal.ref(), &model->matrixVal);
-  _setPersistentVal(cx, &m.positionVal.ref(), &model->positionVal);
-  _setPersistentVal(cx, &m.rotationVal.ref(), &model->rotationVal);
-  _setPersistentVal(cx, &m.scaleVal.ref(), &model->scaleVal);
-
-  // Go ahead and create our self object
-  JS::RootedObject self(cx, NewCoreModel(cx, model));
-
-  // Pull out the onFrame callback if we find one
-  JS::RootedValue onFrameVal(cx);
-  if (JS_GetProperty(cx, opts, "onFrame", &onFrameVal) &&
-      !onFrameVal.isNullOrUndefined()) {
-    if (!onFrameVal.isObject()) {
-      JS_ReportError(cx, "onFrame callback is expected to be a function");
-      return false;
-    }
-    JS::RootedObject onFrameObj(cx, &onFrameVal.toObject());
-    if (!JS_ObjectIsFunction(cx, onFrameObj)) {
-      JS_ReportError(cx, "onFrame callback is expected to be a function");
-      return false;
-    }
-    // Make sure 'this' refers to the model in JS
-    JS::RootedObject boundOnFrameObj(cx, JS_BindCallable(cx, onFrameObj, self));
-    // Persist the callback in our data structure
-    JS::PersistentRootedValue onFrame(cx, JS::ObjectOrNullValue(boundOnFrameObj));
-    model->onFrame.destroyIfConstructed();
-    model->onFrame.construct(cx, onFrame);
+  // Callbacks
+  if (!_constructorCallback(cx, &opts, "onFrame", &self, &model->onFrameVal)) {
+    delete model;
+    return false;
   }
-
-  // Pull out the onHoverOver callback if we find one
-  JS::RootedValue onHoverOverVal(cx);
-  if (JS_GetProperty(cx, opts, "onHoverOver", &onHoverOverVal) &&
-      !onHoverOverVal.isNullOrUndefined()) {
-    if (!onHoverOverVal.isObject()) {
-      JS_ReportError(cx, "onHoverOver callback is expected to be a function");
-      return false;
-    }
-    JS::RootedObject onHoverOverObj(cx, &onHoverOverVal.toObject());
-    if (!JS_ObjectIsFunction(cx, onHoverOverObj)) {
-      JS_ReportError(cx, "onHoverOver callback is expected to be a function");
-      return false;
-    }
-    // Make sure 'this' refers to the model in JS
-    JS::RootedObject boundOnHoverOverObj(cx, JS_BindCallable(cx, onHoverOverObj, self));
-    // Persist the callback in our data structure
-    JS::PersistentRootedValue onHoverOver(cx, JS::ObjectOrNullValue(boundOnHoverOverObj));
-    model->onHoverOver.destroyIfConstructed();
-    model->onHoverOver.construct(cx, onHoverOver);
+  if (!_constructorCallback(cx, &opts, "onGazeHoverOver", &self, &model->onGazeHoverOverVal)) {
+    delete model;
+    return false;
   }
-
-  // Pull out the onHoverOut callback if we find one
-  JS::RootedValue onHoverOutVal(cx);
-  if (JS_GetProperty(cx, opts, "onHoverOut", &onHoverOutVal) &&
-      !onHoverOutVal.isNullOrUndefined()) {
-    if (!onHoverOutVal.isObject()) {
-      JS_ReportError(cx, "onHoverOut callback is expected to be a function");
-      return false;
-    }
-    JS::RootedObject onHoverOutObj(cx, &onHoverOutVal.toObject());
-    if (!JS_ObjectIsFunction(cx, onHoverOutObj)) {
-      JS_ReportError(cx, "onHoverOut callback is expected to be a function");
-      return false;
-    }
-    // Make sure 'this' refers to the model in JS
-    JS::RootedObject boundOnHoverOutObj(cx, JS_BindCallable(cx, onHoverOutObj, self));
-    // Persist the callback in our data structure
-    JS::PersistentRootedValue onHoverOut(cx, JS::ObjectOrNullValue(boundOnHoverOutObj));
-    model->onHoverOut.destroyIfConstructed();
-    model->onHoverOut.construct(cx, onHoverOut);
+  if (!_constructorCallback(cx, &opts, "onGazeHoverOut", &self, &model->onGazeHoverOutVal)) {
+    delete model;
+    return false;
   }
-
-  // Pull out the onGestureTouchDown callback if we find one
-  JS::RootedValue onGestureTouchDownVal(cx);
-  if (JS_GetProperty(cx, opts, "onGestureTouchDown", &onGestureTouchDownVal) &&
-      !onGestureTouchDownVal.isNullOrUndefined()) {
-    if (!onGestureTouchDownVal.isObject()) {
-      JS_ReportError(cx, "onGestureTouchDown callback is expected to be a function");
-      return false;
-    }
-    JS::RootedObject onGestureTouchDownObj(cx, &onGestureTouchDownVal.toObject());
-    if (!JS_ObjectIsFunction(cx, onGestureTouchDownObj)) {
-      JS_ReportError(cx, "onGestureTouchDown callback is expected to be a function");
-      return false;
-    }
-    // Make sure 'this' refers to the model in JS
-    JS::RootedObject boundOnGestureTouchDownObj(cx, JS_BindCallable(cx, onGestureTouchDownObj, self));
-    // Persist the callback in our data structure
-    JS::PersistentRootedValue onGestureTouchDown(cx, JS::ObjectOrNullValue(boundOnGestureTouchDownObj));
-    model->onGestureTouchDown.destroyIfConstructed();
-    model->onGestureTouchDown.construct(cx, onGestureTouchDown);
+  if (!_constructorCallback(cx, &opts, "onGestureTouchDown", &self, &model->onGestureTouchDownVal)) {
+    delete model;
+    return false;
   }
-
-  // Pull out the onGestureTouchUp callback if we find one
-  JS::RootedValue onGestureTouchUpVal(cx);
-  if (JS_GetProperty(cx, opts, "onGestureTouchUp", &onGestureTouchUpVal) &&
-      !onGestureTouchUpVal.isNullOrUndefined()) {
-    if (!onGestureTouchUpVal.isObject()) {
-      JS_ReportError(cx, "onGestureTouchUp callback is expected to be a function");
-      return false;
-    }
-    JS::RootedObject onGestureTouchUpObj(cx, &onGestureTouchUpVal.toObject());
-    if (!JS_ObjectIsFunction(cx, onGestureTouchUpObj)) {
-      JS_ReportError(cx, "onGestureTouchUp callback is expected to be a function");
-      return false;
-    }
-    // Make sure 'this' refers to the model in JS
-    JS::RootedObject boundOnGestureTouchUpObj(cx, JS_BindCallable(cx, onGestureTouchUpObj, self));
-    // Persist the callback in our data structure
-    JS::PersistentRootedValue onGestureTouchUp(cx, JS::ObjectOrNullValue(boundOnGestureTouchUpObj));
-    model->onGestureTouchUp.destroyIfConstructed();
-    model->onGestureTouchUp.construct(cx, onGestureTouchUp);
+  if (!_constructorCallback(cx, &opts, "onGestureTouchUp", &self, &model->onGestureTouchUpVal)) {
+    delete model;
+    return false;
   }
-
-  // Pull out the onGestureTouchCancel callback if we find one
-  JS::RootedValue onGestureTouchCancelVal(cx);
-  if (JS_GetProperty(cx, opts, "onGestureTouchCancel", &onGestureTouchCancelVal) &&
-      !onGestureTouchCancelVal.isNullOrUndefined()) {
-    if (!onGestureTouchCancelVal.isObject()) {
-      JS_ReportError(cx, "onGestureTouchCancel callback is expected to be a function");
-      return false;
-    }
-    JS::RootedObject onGestureTouchCancelObj(cx, &onGestureTouchCancelVal.toObject());
-    if (!JS_ObjectIsFunction(cx, onGestureTouchCancelObj)) {
-      JS_ReportError(cx, "onGestureTouchCancel callback is expected to be a function");
-      return false;
-    }
-    // Make sure 'this' refers to the model in JS
-    JS::RootedObject boundOnGestureTouchCancelObj(cx, JS_BindCallable(cx, onGestureTouchCancelObj, self));
-    // Persist the callback in our data structure
-    JS::PersistentRootedValue onGestureTouchCancel(cx, JS::ObjectOrNullValue(boundOnGestureTouchCancelObj));
-    model->onGestureTouchCancel.destroyIfConstructed();
-    model->onGestureTouchCancel.construct(cx, onGestureTouchCancel);
+  if (!_constructorCallback(cx, &opts, "onGestureTouchCancel", &self, &model->onGestureTouchCancelVal)) {
+    delete model;
+    return false;
   }
 
   // Return our self object
@@ -448,6 +396,66 @@ bool CoreModel_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
     return _setPersistentVal(cx, vp, &model->scaleVal);
   }
 
+  // OnFrame callback
+  if (!_jsStrEq(cx, &propertyName, "onFrame", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->onFrameVal);
+  }
+
+  // OnGazeHoverOver callback
+  if (!_jsStrEq(cx, &propertyName, "onGazeHoverOver", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->onGazeHoverOverVal);
+  }
+
+  // OnGazeHoverOut callback
+  if (!_jsStrEq(cx, &propertyName, "onGazeHoverOut", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->onGazeHoverOutVal);
+  }
+
+  // OnGestureTouchDown callback
+  if (!_jsStrEq(cx, &propertyName, "onGestureTouchDown", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->onGestureTouchDownVal);
+  }
+
+  // OnGestureTouchUp callback
+  if (!_jsStrEq(cx, &propertyName, "onGestureTouchUp", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->onGestureTouchUpVal);
+  }
+
+  // OnGestureTouchCancel callback
+  if (!_jsStrEq(cx, &propertyName, "onGestureTouchCancel", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->onGestureTouchCancelVal);
+  }
+
   return true;
 }
 
@@ -508,6 +516,60 @@ bool CoreModel_getProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
     return true;
   }
 
+  // OnFrame callback
+  if (!_jsStrEq(cx, &propertyName, "onFrame", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->onFrameVal.empty() ?
+      JS::NullValue() : model->onFrameVal.ref());
+    return true;
+  }
+
+  // OnGazeHoverOver callback
+  if (!_jsStrEq(cx, &propertyName, "onGazeHoverOver", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->onGazeHoverOverVal.empty() ?
+      JS::NullValue() : model->onGazeHoverOverVal.ref());
+    return true;
+  }
+
+  // OnGazeHoverOut callback
+  if (!_jsStrEq(cx, &propertyName, "onGazeHoverOut", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->onGazeHoverOutVal.empty() ?
+      JS::NullValue() : model->onGazeHoverOutVal.ref());
+    return true;
+  }
+
+  // OnGestureTouchDown callback
+  if (!_jsStrEq(cx, &propertyName, "onGestureTouchDown", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->onGestureTouchDownVal.empty() ?
+      JS::NullValue() : model->onGestureTouchDownVal.ref());
+    return true;
+  }
+
+  // OnGestureTouchUp callback
+  if (!_jsStrEq(cx, &propertyName, "onGestureTouchUp", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->onGestureTouchUpVal.empty() ?
+      JS::NullValue() : model->onGestureTouchUpVal.ref());
+    return true;
+  }
+
+  // OnGestureTouchCancel callback
+  if (!_jsStrEq(cx, &propertyName, "onGestureTouchCancel", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->onGestureTouchCancelVal.empty() ?
+      JS::NullValue() : model->onGestureTouchCancelVal.ref());
+    return true;
+  }
+
   return true;
 }
 
@@ -520,12 +582,12 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   model->positionVal.destroyIfConstructed();
   model->rotationVal.destroyIfConstructed();
   model->scaleVal.destroyIfConstructed();
-  model->onFrame.destroyIfConstructed();
-  model->onHoverOver.destroyIfConstructed();
-  model->onHoverOut.destroyIfConstructed();
-  model->onGestureTouchDown.destroyIfConstructed();
-  model->onGestureTouchUp.destroyIfConstructed();
-  model->onGestureTouchCancel.destroyIfConstructed();
+  model->onFrameVal.destroyIfConstructed();
+  model->onGazeHoverOverVal.destroyIfConstructed();
+  model->onGazeHoverOutVal.destroyIfConstructed();
+  model->onGestureTouchDownVal.destroyIfConstructed();
+  model->onGestureTouchUpVal.destroyIfConstructed();
+  model->onGestureTouchCancelVal.destroyIfConstructed();
   delete model->computedMatrix;
   // TODO: Figure out what to do about ownership of this value and whether to free it
   delete model;
