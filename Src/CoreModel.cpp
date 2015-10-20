@@ -25,8 +25,8 @@ void CoreModel::ComputeMatrix(JSContext *cx) {
   if (scale != NULL) {
     mtx *= OVR::Matrix4f::Scaling(*(scale));
   }
-  if (position != NULL) {
-    mtx.SetTranslation(*(position));
+  if (position(cx) != NULL) {
+    mtx.SetTranslation(*(position(cx)));
   }
   if (computedMatrix != NULL) {
     delete computedMatrix;
@@ -60,6 +60,15 @@ OVR::Matrix4f* CoreModel::matrix(JSContext *cx) {
   JS::RootedValue val(cx, matrixVal.ref());
   JS::RootedObject obj(cx, &val.toObject());
   return GetMatrix4f(obj);
+}
+
+OVR::Vector3f* CoreModel::position(JSContext *cx) {
+  if (positionVal.empty()) {
+    return NULL;
+  }
+  JS::RootedValue val(cx, positionVal.ref());
+  JS::RootedObject obj(cx, &val.toObject());
+  return GetVector3f(obj);
 }
 
 bool _jsStrEq(JSContext *cx, JS::RootedString* first, const char* second, bool *match) {
@@ -170,15 +179,18 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
-  // Get a reference to the position vector
-  JS::RootedValue positionVal(cx);
-  OVR::Vector3f* position = NULL;
-  if (JS_GetProperty(cx, opts, "position", &positionVal) && !positionVal.isNullOrUndefined()) {
-    // TODO: Error handling (attn: security)
-    JS::RootedObject positionObj(cx, &positionVal.toObject());
-    position = GetVector3f(positionObj);
+  // Position
+  JS::RootedValue position(cx);
+  if (!JS_GetProperty(cx, opts, "position", &position) || position.isNullOrUndefined()) {
+    position = JS::RootedValue(cx,
+      JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f)));
   }
-  // TODO: Else clause on this
+  if (!_ensureObject(cx, &position)) {
+    return false;
+  }
+  if (!_setPersistentVal(cx, &position, &m.positionVal)) {
+    return false;
+  }
 
   // Get a reference to the rotation vector
   JS::RootedValue rotationVal(cx);
@@ -205,7 +217,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   _setPersistentVal(cx, &m.geometryVal.ref(), &model->geometryVal);
   _setPersistentVal(cx, &m.programVal.ref(), &model->programVal);
   _setPersistentVal(cx, &m.matrixVal.ref(), &model->matrixVal);
-  model->position = position;
+  _setPersistentVal(cx, &m.positionVal.ref(), &model->positionVal);
   model->rotation = rotation;
   model->scale = scale;
 
@@ -350,7 +362,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     JS_ReportError(cx, "Could not set transform property on model object");
     return false;
   }
-  if (!JS_SetProperty(cx, self, "position", positionVal)) {
+  if (!JS_SetProperty(cx, self, "position", position)) {
     JS_ReportError(cx, "Could not set position property on model object");
     return false;
   }
@@ -410,6 +422,7 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   model->geometryVal.destroyIfConstructed();
   model->programVal.destroyIfConstructed();
   model->matrixVal.destroyIfConstructed();
+  model->positionVal.destroyIfConstructed();
   model->onFrame.destroyIfConstructed();
   model->onHoverOver.destroyIfConstructed();
   model->onHoverOut.destroyIfConstructed();

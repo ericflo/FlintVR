@@ -10,16 +10,21 @@
 class CoreModel {
 public:
 	int id;
+  bool isHovered;
+  bool isTouching;
+
   CoreGeometry* geometry(JSContext *cx);
   OVR::GlProgram* program(JSContext *cx);
   OVR::Matrix4f* matrix(JSContext *cx);
-  void ComputeMatrix(JSContext *cx);
+  OVR::Vector3f* position(JSContext *cx);
 
   mozilla::Maybe<JS::PersistentRootedValue> geometryVal;
   mozilla::Maybe<JS::PersistentRootedValue> programVal;
   mozilla::Maybe<JS::PersistentRootedValue> matrixVal;
+  mozilla::Maybe<JS::PersistentRootedValue> positionVal;
+
+  void ComputeMatrix(JSContext *cx);
   
-	OVR::Vector3f* position;
 	OVR::Vector3f* rotation;
 	OVR::Vector3f* scale;
   OVR::Matrix4f* computedMatrix = NULL;
@@ -29,8 +34,7 @@ public:
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchDown;
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchUp;
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancel;
-	bool isHovered;
-  bool isTouching;
+	
 };
 
 int GetNextModelId();
