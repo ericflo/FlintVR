@@ -10,6 +10,31 @@ int GetNextModelId() {
   return CURRENT_MODEL_ID++;
 }
 
+void CoreModel::ComputeMatrix(JSContext *cx) {
+  OVR::Matrix4f mtx;
+  if (matrix(cx) != NULL) {
+    mtx = *(matrix(cx));
+  }
+  if (rotation != NULL) {
+    mtx *= (
+      OVR::Matrix4f::RotationX(rotation->x) *
+      OVR::Matrix4f::RotationY(rotation->y) *
+      OVR::Matrix4f::RotationZ(rotation->z)
+    );
+  }
+  if (scale != NULL) {
+    mtx *= OVR::Matrix4f::Scaling(*(scale));
+  }
+  if (position != NULL) {
+    mtx.SetTranslation(*(position));
+  }
+  if (computedMatrix != NULL) {
+    delete computedMatrix;
+    computedMatrix = NULL;
+  }
+  computedMatrix = new OVR::Matrix4f(mtx);
+}
+
 CoreGeometry* CoreModel::geometry(JSContext *cx) {
   if (geometryVal.empty()) {
     return NULL;
@@ -26,6 +51,15 @@ OVR::GlProgram* CoreModel::program(JSContext *cx) {
   JS::RootedValue val(cx, programVal.ref());
   JS::RootedObject obj(cx, &val.toObject());
   return GetProgram(obj);
+}
+
+OVR::Matrix4f* CoreModel::matrix(JSContext *cx) {
+  if (matrixVal.empty()) {
+    return NULL;
+  }
+  JS::RootedValue val(cx, matrixVal.ref());
+  JS::RootedObject obj(cx, &val.toObject());
+  return GetMatrix4f(obj);
 }
 
 bool _jsStrEq(JSContext *cx, JS::RootedString* first, const char* second, bool *match) {
@@ -49,45 +83,6 @@ bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
     return false;
   }
   return true;
-}
-
-bool _ensureGeometry(JSContext *cx, JS::MutableHandleValue vp) {
-  if (!_ensureObject(cx, vp)) {
-    return false;
-  }
-  return true;
-}
-
-bool _ensureProgram(JSContext *cx, JS::MutableHandleValue vp) {
-  if (!_ensureObject(cx, vp)) {
-    return false;
-  }
-  return true;
-}
-
-void ComputeModelMatrix(CoreModel* model) {
-  OVR::Matrix4f matrix;
-  if (model->matrix != NULL) {
-    matrix = *(model->matrix);
-  }
-  if (model->rotation != NULL) {
-    matrix *= (
-      OVR::Matrix4f::RotationX(model->rotation->x) *
-      OVR::Matrix4f::RotationY(model->rotation->y) *
-      OVR::Matrix4f::RotationZ(model->rotation->z)
-    );
-  }
-  if (model->scale != NULL) {
-    matrix *= OVR::Matrix4f::Scaling(*(model->scale));
-  }
-  if (model->position != NULL) {
-    matrix.SetTranslation(*(model->position));
-  }
-  if (model->computedMatrix != NULL) {
-    delete model->computedMatrix;
-    model->computedMatrix = NULL;
-  }
-  model->computedMatrix = new OVR::Matrix4f(matrix);
 }
 
 static JSClass coreModelClass = {
@@ -136,29 +131,42 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 
   CoreModel m;
 
-  // Get a reference to the GlGeometry from the opts object
+  // Geometry
   JS::RootedValue geometry(cx);
   if (!JS_GetProperty(cx, opts, "geometry", &geometry)) {
     JS_ReportError(cx, "Could not find 'geometry' option");
     return false;
   }
-  if (!_ensureGeometry(cx, &geometry)) {
+  if (!_ensureObject(cx, &geometry)) {
     return false;
   }
   if (!_setPersistentVal(cx, &geometry, &m.geometryVal)) {
     return false;
   }
 
-  // Get a reference to the GlProgram from the opts object
+  // Program
   JS::RootedValue program(cx);
   if (!JS_GetProperty(cx, opts, "program", &program)) {
     JS_ReportError(cx, "Could not find 'program' option");
     return false;
   }
-  if (!_ensureProgram(cx, &program)) {
+  if (!_ensureObject(cx, &program)) {
     return false;
   }
   if (!_setPersistentVal(cx, &program, &m.programVal)) {
+    return false;
+  }
+
+  // Base transform matrix
+  JS::RootedValue matrix(cx);
+  if (!JS_GetProperty(cx, opts, "transform", &matrix) || matrix.isNullOrUndefined()) {
+    matrix = JS::RootedValue(cx,
+      JS::ObjectOrNullValue(NewCoreMatrix4f(cx, new OVR::Matrix4f)));
+  }
+  if (!_ensureObject(cx, &matrix)) {
+    return false;
+  }
+  if (!_setPersistentVal(cx, &matrix, &m.matrixVal)) {
     return false;
   }
 
@@ -192,20 +200,11 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   }
   // TODO: Else clause on this
 
-  // Get a reference to the transform matrix
-  JS::RootedValue matrixVal(cx);
-  OVR::Matrix4f* matrix = NULL;
-  if (JS_GetProperty(cx, opts, "transform", &matrixVal) && !matrixVal.isNullOrUndefined()) {
-    // TODO: Error handling (attn: security)
-    JS::RootedObject matrixObj(cx, &matrixVal.toObject());
-    matrix = GetMatrix4f(matrixObj);
-  }
-
   CoreModel* model = new CoreModel;
   model->id = GetNextModelId();
   _setPersistentVal(cx, &m.geometryVal.ref(), &model->geometryVal);
   _setPersistentVal(cx, &m.programVal.ref(), &model->programVal);
-  model->matrix = matrix;
+  _setPersistentVal(cx, &m.matrixVal.ref(), &model->matrixVal);
   model->position = position;
   model->rotation = rotation;
   model->scale = scale;
@@ -347,7 +346,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     JS_ReportError(cx, "Could not set program property on model object");
     return false;
   }
-  if (!JS_SetProperty(cx, self, "transform", matrixVal)) {
+  if (!JS_SetProperty(cx, self, "transform", matrix)) {
     JS_ReportError(cx, "Could not set transform property on model object");
     return false;
   }
@@ -382,7 +381,7 @@ bool CoreModel_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
   if (!_jsStrEq(cx, &propertyName, "geometry", &match)) {
     return false;
   } else if (match) {
-    if (!_ensureGeometry(cx, vp)) {
+    if (!_ensureObject(cx, vp)) {
       return false;
     }
     return _setPersistentVal(cx, vp, &model->geometryVal);
@@ -392,7 +391,7 @@ bool CoreModel_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
   if (!_jsStrEq(cx, &propertyName, "program", &match)) {
     return false;
   } else if (match) {
-    if (!_ensureProgram(cx, vp)) {
+    if (!_ensureObject(cx, vp)) {
       return false;
     }
     return _setPersistentVal(cx, vp, &model->programVal);
@@ -410,6 +409,7 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   JS_SetPrivate(obj, NULL);
   model->geometryVal.destroyIfConstructed();
   model->programVal.destroyIfConstructed();
+  model->matrixVal.destroyIfConstructed();
   model->onFrame.destroyIfConstructed();
   model->onHoverOver.destroyIfConstructed();
   model->onHoverOut.destroyIfConstructed();

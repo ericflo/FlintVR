@@ -12,11 +12,13 @@ public:
 	int id;
   CoreGeometry* geometry(JSContext *cx);
   OVR::GlProgram* program(JSContext *cx);
+  OVR::Matrix4f* matrix(JSContext *cx);
+  void ComputeMatrix(JSContext *cx);
 
   mozilla::Maybe<JS::PersistentRootedValue> geometryVal;
   mozilla::Maybe<JS::PersistentRootedValue> programVal;
-
-  OVR::Matrix4f* matrix;
+  mozilla::Maybe<JS::PersistentRootedValue> matrixVal;
+  
 	OVR::Vector3f* position;
 	OVR::Vector3f* rotation;
 	OVR::Vector3f* scale;
@@ -32,7 +34,6 @@ public:
 };
 
 int GetNextModelId();
-void ComputeModelMatrix(CoreModel* model);
 
 void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);
 JSObject* NewCoreModel(JSContext *cx, CoreModel* model);

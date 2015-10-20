@@ -301,7 +301,7 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 		// Compute each model's transform matrix
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
 			CoreModel* model = coreScene->graph->at(i);
-			ComputeModelMatrix(model);
+			model->ComputeMatrix(cx);
 		}
 
 		// Call the frame callbacks
