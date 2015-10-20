@@ -17,16 +17,18 @@ public:
   OVR::GlProgram* program(JSContext *cx);
   OVR::Matrix4f* matrix(JSContext *cx);
   OVR::Vector3f* position(JSContext *cx);
+  OVR::Vector3f* rotation(JSContext *cx);
+  OVR::Vector3f* scale(JSContext *cx);
 
   mozilla::Maybe<JS::PersistentRootedValue> geometryVal;
   mozilla::Maybe<JS::PersistentRootedValue> programVal;
   mozilla::Maybe<JS::PersistentRootedValue> matrixVal;
   mozilla::Maybe<JS::PersistentRootedValue> positionVal;
+  mozilla::Maybe<JS::PersistentRootedValue> rotationVal;
+  mozilla::Maybe<JS::PersistentRootedValue> scaleVal;
 
   void ComputeMatrix(JSContext *cx);
-  
-	OVR::Vector3f* rotation;
-	OVR::Vector3f* scale;
+
   OVR::Matrix4f* computedMatrix = NULL;
   mozilla::Maybe<JS::PersistentRootedValue> onFrame;
 	mozilla::Maybe<JS::PersistentRootedValue> onHoverOver;

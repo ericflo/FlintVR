@@ -15,15 +15,15 @@ void CoreModel::ComputeMatrix(JSContext *cx) {
   if (matrix(cx) != NULL) {
     mtx = *(matrix(cx));
   }
-  if (rotation != NULL) {
+  if (rotation(cx) != NULL) {
     mtx *= (
-      OVR::Matrix4f::RotationX(rotation->x) *
-      OVR::Matrix4f::RotationY(rotation->y) *
-      OVR::Matrix4f::RotationZ(rotation->z)
+      OVR::Matrix4f::RotationX(rotation(cx)->x) *
+      OVR::Matrix4f::RotationY(rotation(cx)->y) *
+      OVR::Matrix4f::RotationZ(rotation(cx)->z)
     );
   }
-  if (scale != NULL) {
-    mtx *= OVR::Matrix4f::Scaling(*(scale));
+  if (scale(cx) != NULL) {
+    mtx *= OVR::Matrix4f::Scaling(*(scale(cx)));
   }
   if (position(cx) != NULL) {
     mtx.SetTranslation(*(position(cx)));
@@ -67,6 +67,24 @@ OVR::Vector3f* CoreModel::position(JSContext *cx) {
     return NULL;
   }
   JS::RootedValue val(cx, positionVal.ref());
+  JS::RootedObject obj(cx, &val.toObject());
+  return GetVector3f(obj);
+}
+
+OVR::Vector3f* CoreModel::rotation(JSContext *cx) {
+  if (rotationVal.empty()) {
+    return NULL;
+  }
+  JS::RootedValue val(cx, rotationVal.ref());
+  JS::RootedObject obj(cx, &val.toObject());
+  return GetVector3f(obj);
+}
+
+OVR::Vector3f* CoreModel::scale(JSContext *cx) {
+  if (scaleVal.empty()) {
+    return NULL;
+  }
+  JS::RootedValue val(cx, scaleVal.ref());
   JS::RootedObject obj(cx, &val.toObject());
   return GetVector3f(obj);
 }
@@ -192,25 +210,31 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
-  // Get a reference to the rotation vector
-  JS::RootedValue rotationVal(cx);
-  OVR::Vector3f* rotation = NULL;
-  if (JS_GetProperty(cx, opts, "rotation", &rotationVal) && !rotationVal.isNullOrUndefined()) {
-    // TODO: Error handling (attn: security)
-    JS::RootedObject rotateObj(cx, &rotationVal.toObject());
-    rotation = GetVector3f(rotateObj);
+  // Rotation
+  JS::RootedValue rotation(cx);
+  if (!JS_GetProperty(cx, opts, "rotation", &rotation) || rotation.isNullOrUndefined()) {
+    rotation = JS::RootedValue(cx,
+      JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f)));
   }
-  // TODO: Else clause on this
+  if (!_ensureObject(cx, &rotation)) {
+    return false;
+  }
+  if (!_setPersistentVal(cx, &rotation, &m.rotationVal)) {
+    return false;
+  }
 
-  // Get a reference to the scale vector
-  JS::RootedValue scaleVal(cx);
-  OVR::Vector3f* scale = NULL;
-  if (JS_GetProperty(cx, opts, "scale", &scaleVal) && !scaleVal.isNullOrUndefined()) {
-    // TODO: Error handling (attn: security)
-    JS::RootedObject rotateObj(cx, &scaleVal.toObject());
-    scale = GetVector3f(rotateObj);
+  // Scale
+  JS::RootedValue scale(cx);
+  if (!JS_GetProperty(cx, opts, "scale", &scale) || scale.isNullOrUndefined()) {
+    scale = JS::RootedValue(cx,
+      JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f)));
   }
-  // TODO: Else clause on this
+  if (!_ensureObject(cx, &scale)) {
+    return false;
+  }
+  if (!_setPersistentVal(cx, &scale, &m.scaleVal)) {
+    return false;
+  }
 
   CoreModel* model = new CoreModel;
   model->id = GetNextModelId();
@@ -218,8 +242,8 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   _setPersistentVal(cx, &m.programVal.ref(), &model->programVal);
   _setPersistentVal(cx, &m.matrixVal.ref(), &model->matrixVal);
   _setPersistentVal(cx, &m.positionVal.ref(), &model->positionVal);
-  model->rotation = rotation;
-  model->scale = scale;
+  _setPersistentVal(cx, &m.rotationVal.ref(), &model->rotationVal);
+  _setPersistentVal(cx, &m.scaleVal.ref(), &model->scaleVal);
 
   // Go ahead and create our self object
   JS::RootedObject self(cx, NewCoreModel(cx, model));
@@ -350,31 +374,6 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     model->onGestureTouchCancel.construct(cx, onGestureTouchCancel);
   }
 
-  if (!JS_SetProperty(cx, self, "geometry", geometry)) {
-    JS_ReportError(cx, "Could not set geometry property on model object");
-    return false;
-  }
-  if (!JS_SetProperty(cx, self, "program", program)) {
-    JS_ReportError(cx, "Could not set program property on model object");
-    return false;
-  }
-  if (!JS_SetProperty(cx, self, "transform", matrix)) {
-    JS_ReportError(cx, "Could not set transform property on model object");
-    return false;
-  }
-  if (!JS_SetProperty(cx, self, "position", position)) {
-    JS_ReportError(cx, "Could not set position property on model object");
-    return false;
-  }
-  if (!JS_SetProperty(cx, self, "rotation", rotationVal)) {
-    JS_ReportError(cx, "Could not set rotation property on model object");
-    return false;
-  }
-  if (!JS_SetProperty(cx, self, "scale", scaleVal)) {
-    JS_ReportError(cx, "Could not set scale property on model object");
-    return false;
-  }
-
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));
   return true;
@@ -409,11 +408,107 @@ bool CoreModel_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
     return _setPersistentVal(cx, vp, &model->programVal);
   }
 
+  // Matrix property
+  if (!_jsStrEq(cx, &propertyName, "transform", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->matrixVal);
+  }
+
+  // Position property
+  if (!_jsStrEq(cx, &propertyName, "position", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->positionVal);
+  }
+
+  // Rotation property
+  if (!_jsStrEq(cx, &propertyName, "rotation", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->rotationVal);
+  }
+
+  // Scale property
+  if (!_jsStrEq(cx, &propertyName, "scale", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureObject(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->scaleVal);
+  }
+
   return true;
 }
 
 bool CoreModel_getProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp) {
-  return JS_PropertyStub(cx, obj, id, vp);
+  if (!JSID_IS_STRING(id)) {
+    return true;
+  }
+
+  JS::RootedString propertyName(cx, JSID_TO_STRING(id));
+  CoreModel* model = GetCoreModel(obj);
+  bool match;
+
+  // Geometry property
+  if (!_jsStrEq(cx, &propertyName, "geometry", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->geometryVal.ref());
+    return true;
+  }
+
+  // Program property
+  if (!_jsStrEq(cx, &propertyName, "program", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->programVal.ref());
+    return true;
+  }
+
+  // Matrix property
+  if (!_jsStrEq(cx, &propertyName, "transform", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->matrixVal.ref());
+    return true;
+  }
+
+  // Position property
+  if (!_jsStrEq(cx, &propertyName, "position", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->positionVal.ref());
+    return true;
+  }
+
+  // Rotation property
+  if (!_jsStrEq(cx, &propertyName, "rotation", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->rotationVal.ref());
+    return true;
+  }
+
+  // Scale property
+  if (!_jsStrEq(cx, &propertyName, "scale", &match)) {
+    return false;
+  } else if (match) {
+    vp.set(model->scaleVal.ref());
+    return true;
+  }
+
+  return true;
 }
 
 void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
@@ -423,6 +518,8 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   model->programVal.destroyIfConstructed();
   model->matrixVal.destroyIfConstructed();
   model->positionVal.destroyIfConstructed();
+  model->rotationVal.destroyIfConstructed();
+  model->scaleVal.destroyIfConstructed();
   model->onFrame.destroyIfConstructed();
   model->onHoverOver.destroyIfConstructed();
   model->onHoverOut.destroyIfConstructed();
