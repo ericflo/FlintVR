@@ -11,9 +11,11 @@ class CoreModel {
 public:
 	int id;
   CoreGeometry* geometry(JSContext *cx);
+  OVR::GlProgram* program(JSContext *cx);
 
   mozilla::Maybe<JS::PersistentRootedValue> geometryVal;
-	OVR::GlProgram* program;
+  mozilla::Maybe<JS::PersistentRootedValue> programVal;
+
   OVR::Matrix4f* matrix;
 	OVR::Vector3f* position;
 	OVR::Vector3f* rotation;

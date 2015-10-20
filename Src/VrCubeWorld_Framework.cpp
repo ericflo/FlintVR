@@ -446,10 +446,10 @@ Matrix4f VrCubeWorld::DrawEyeView( const int eye, const float fovDegreesX, const
 			}
 
 			// Now submit the draw calls
-			GL( glUseProgram( model->program->program ) );
-			GL( glUniformMatrix4fv( model->program->uModel, 1, GL_TRUE, model->computedMatrix->M[0] ) );
-			GL( glUniformMatrix4fv( model->program->uView, 1, GL_TRUE, eyeViewMatrix.M[0] ) );
-			GL( glUniformMatrix4fv( model->program->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0] ) );
+			GL( glUseProgram( model->program(cx)->program ) );
+			GL( glUniformMatrix4fv( model->program(cx)->uModel, 1, GL_TRUE, model->computedMatrix->M[0] ) );
+			GL( glUniformMatrix4fv( model->program(cx)->uView, 1, GL_TRUE, eyeViewMatrix.M[0] ) );
+			GL( glUniformMatrix4fv( model->program(cx)->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0] ) );
 			GL( glBindVertexArray( model->geometry(cx)->geometry->vertexArrayObject ) );
 			GL( glDrawElements( GL_TRIANGLES, model->geometry(cx)->geometry->indexCount, GL_UNSIGNED_SHORT, NULL ) );
 		}

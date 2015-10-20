@@ -19,6 +19,23 @@ CoreGeometry* CoreModel::geometry(JSContext *cx) {
   return GetGeometry(obj);
 }
 
+OVR::GlProgram* CoreModel::program(JSContext *cx) {
+  if (programVal.empty()) {
+    return NULL;
+  }
+  JS::RootedValue val(cx, programVal.ref());
+  JS::RootedObject obj(cx, &val.toObject());
+  return GetProgram(obj);
+}
+
+bool _jsStrEq(JSContext *cx, JS::RootedString* first, const char* second, bool *match) {
+  if (!JS_StringEqualsAscii(cx, *first, second, match)) {
+    JS_ReportError(cx, "Could not compare strings");
+    return false;
+  }
+  return true;
+}
+
 bool _setPersistentVal(JSContext *cx, JS::MutableHandleValue vp, mozilla::Maybe<JS::PersistentRootedValue>* out) {
   JS::PersistentRootedValue persistentVal(cx, vp);
   out->destroyIfConstructed();
@@ -35,6 +52,13 @@ bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
 }
 
 bool _ensureGeometry(JSContext *cx, JS::MutableHandleValue vp) {
+  if (!_ensureObject(cx, vp)) {
+    return false;
+  }
+  return true;
+}
+
+bool _ensureProgram(JSContext *cx, JS::MutableHandleValue vp) {
   if (!_ensureObject(cx, vp)) {
     return false;
   }
@@ -131,12 +155,12 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     JS_ReportError(cx, "Could not find 'program' option");
     return false;
   }
-  if (!program.isObject()) {
-    JS_ReportError(cx, "Expected program to be an object");
+  if (!_ensureProgram(cx, &program)) {
     return false;
   }
-  // TODO: Validate object type before casting
-  JS::RootedObject programObj(cx, &program.toObject());
+  if (!_setPersistentVal(cx, &program, &m.programVal)) {
+    return false;
+  }
 
   // Get a reference to the position vector
   JS::RootedValue positionVal(cx);
@@ -180,8 +204,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   CoreModel* model = new CoreModel;
   model->id = GetNextModelId();
   _setPersistentVal(cx, &m.geometryVal.ref(), &model->geometryVal);
-  //model->geometryVal.construct(m.geometryVal.ref());
-  model->program = GetProgram(programObj);
+  _setPersistentVal(cx, &m.programVal.ref(), &model->programVal);
   model->matrix = matrix;
   model->position = position;
   model->rotation = rotation;
@@ -346,14 +369,6 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool _jsStrEq(JSContext *cx, JS::RootedString* first, const char* second, bool *match) {
-  if (!JS_StringEqualsAscii(cx, *first, second, match)) {
-    JS_ReportError(cx, "Could not compare strings");
-    return false;
-  }
-  return true;
-}
-
 bool CoreModel_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool strict, JS::MutableHandleValue vp) {
   if (!JSID_IS_STRING(id)) {
     return true;
@@ -361,9 +376,9 @@ bool CoreModel_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
 
   JS::RootedString propertyName(cx, JSID_TO_STRING(id));
   CoreModel* model = GetCoreModel(obj);
+  bool match;
 
   // Geometry property
-  bool match;
   if (!_jsStrEq(cx, &propertyName, "geometry", &match)) {
     return false;
   } else if (match) {
@@ -371,6 +386,16 @@ bool CoreModel_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
       return false;
     }
     return _setPersistentVal(cx, vp, &model->geometryVal);
+  }
+
+  // Program property
+  if (!_jsStrEq(cx, &propertyName, "program", &match)) {
+    return false;
+  } else if (match) {
+    if (!_ensureProgram(cx, vp)) {
+      return false;
+    }
+    return _setPersistentVal(cx, vp, &model->programVal);
   }
 
   return true;
@@ -384,6 +409,7 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
   JS_SetPrivate(obj, NULL);
   model->geometryVal.destroyIfConstructed();
+  model->programVal.destroyIfConstructed();
   model->onFrame.destroyIfConstructed();
   model->onHoverOver.destroyIfConstructed();
   model->onHoverOut.destroyIfConstructed();
