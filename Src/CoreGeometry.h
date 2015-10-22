@@ -4,11 +4,12 @@
 #include "BaseInclude.h"
 #include "ParseVertexAttribs.h"
 
-typedef struct CoreGeometry {
+class CoreGeometry {
+public:
   OVR::GlGeometry* geometry;
   OVR::VertexAttribs* vertices;
   OVR::Array<OVR::TriangleIndex> indices;
-} CoreGeometry;
+};
 
 void SetupCoreGeometry(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);
 //JSObject* NewCoreGeometry(JSContext *cx, OVR::GlGeometry *geometry);

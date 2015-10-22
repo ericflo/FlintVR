@@ -67,82 +67,91 @@ static JSClass coreModelClass = {
   JSCLASS_HAS_PRIVATE    /* flags */
 };
 
-#define COREMODEL_IMPL(name) \
-  static bool CoreModel_get_##name(JSContext *cx, unsigned argc, JS::Value *vp) { \
+#define VRJS_GETSET(ClassName, name) \
+  static bool ClassName##_get_##name(JSContext *cx, unsigned argc, JS::Value *vp) { \
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp); \
     JS::RootedObject self(cx, &args.thisv().toObject()); \
-    CoreModel* model = GetCoreModel(self); \
+    ClassName* model = Get##ClassName(self); \
     args.rval().set(model == NULL || model->name##Val.isNothing() ? JS::NullValue() : model->name##Val.ref()); \
     return true; \
   } \
   \
-  static bool CoreModel_set_##name(JSContext *cx, unsigned argc, JS::Value *vp) { \
+  static bool ClassName##_set_##name(JSContext *cx, unsigned argc, JS::Value *vp) { \
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp); \
     if (!args[0].isObject()) { \
       JS_ReportError(cx, "Unexpected argument (expected ##name)"); \
       return false; \
     } \
     JS::RootedObject self(cx, &args.thisv().toObject()); \
-    CoreModel* model = GetCoreModel(self); \
+    ClassName* model = Get##ClassName(self); \
     mozilla::Maybe<JS::PersistentRootedValue>* val = &model->name##Val; \
     val->reset(); \
     val->emplace(cx, *vp); \
     return true; \
   }
 
-COREMODEL_IMPL(geometry)
-COREMODEL_IMPL(program)
-COREMODEL_IMPL(matrix)
-COREMODEL_IMPL(position)
-COREMODEL_IMPL(rotation)
-COREMODEL_IMPL(scale)
-COREMODEL_IMPL(onFrame)
-COREMODEL_IMPL(onGazeHoverOver)
-COREMODEL_IMPL(onGazeHoverOut)
-COREMODEL_IMPL(onGestureTouchDown)
-COREMODEL_IMPL(onGestureTouchUp)
-COREMODEL_IMPL(onGestureTouchCancel)
+#define VRJS_PROP(ClassName, name) \
+  JS_PSGS(#name, ClassName##_get_##name, ClassName##_set_##name, JSPROP_PERMANENT)
 
-#define COREMODEL_PROPSPEC(name) \
-  JS_PSGS(#name, CoreModel_get_##name, CoreModel_set_##name, JSPROP_PERMANENT)
-
-static JSPropertySpec CoreModel_props[] = {
-  COREMODEL_PROPSPEC(geometry),
-  COREMODEL_PROPSPEC(program),
-  COREMODEL_PROPSPEC(matrix),
-  COREMODEL_PROPSPEC(position),
-  COREMODEL_PROPSPEC(rotation),
-  COREMODEL_PROPSPEC(scale),
-  COREMODEL_PROPSPEC(onFrame),
-  COREMODEL_PROPSPEC(onGazeHoverOver),
-  COREMODEL_PROPSPEC(onGazeHoverOut),
-  COREMODEL_PROPSPEC(onGestureTouchDown),
-  COREMODEL_PROPSPEC(onGestureTouchUp),
-  COREMODEL_PROPSPEC(onGestureTouchCancel),
-  JS_PS_END
-};
-
-#define COREMODEL_MEMBER(name, getter) \
-  CoreModel::name(JSContext *cx) { \
+#define VRJS_MEMBER(ClassName, name, getter) \
+  ClassName::name(JSContext *cx) { \
     if (name##Val.isNothing()) { \
       return NULL; \
     } \
-    JS::RootedValue val(cx, name##Val.ref()); \
-    JS::RootedObject obj(cx, &val.toObject()); \
+    JS::RootedObject obj(cx, &name##Val.ref().toObject()); \
     return getter(obj); \
   }
 
-CoreGeometry* COREMODEL_MEMBER(geometry, GetGeometry);
-OVR::GlProgram* COREMODEL_MEMBER(program, GetProgram);
-OVR::Matrix4f* COREMODEL_MEMBER(matrix, GetMatrix4f);
-OVR::Vector3f* COREMODEL_MEMBER(position, GetVector3f);
-OVR::Vector3f* COREMODEL_MEMBER(rotation, GetVector3f);
-OVR::Vector3f* COREMODEL_MEMBER(scale, GetVector3f);
+VRJS_GETSET(CoreModel, geometry)
+VRJS_GETSET(CoreModel, program)
+VRJS_GETSET(CoreModel, matrix)
+VRJS_GETSET(CoreModel, position)
+VRJS_GETSET(CoreModel, rotation)
+VRJS_GETSET(CoreModel, scale)
+VRJS_GETSET(CoreModel, onFrame)
+VRJS_GETSET(CoreModel, onGazeHoverOver)
+VRJS_GETSET(CoreModel, onGazeHoverOut)
+VRJS_GETSET(CoreModel, onGestureTouchDown)
+VRJS_GETSET(CoreModel, onGestureTouchUp)
+VRJS_GETSET(CoreModel, onGestureTouchCancel)
 
-bool _setPersistentVal(JSContext *cx, JS::MutableHandleValue vp, mozilla::Maybe<JS::PersistentRootedValue>& out) {
+static JSPropertySpec CoreModel_props[] = {
+  VRJS_PROP(CoreModel, geometry),
+  VRJS_PROP(CoreModel, program),
+  VRJS_PROP(CoreModel, matrix),
+  VRJS_PROP(CoreModel, position),
+  VRJS_PROP(CoreModel, rotation),
+  VRJS_PROP(CoreModel, scale),
+  VRJS_PROP(CoreModel, onFrame),
+  VRJS_PROP(CoreModel, onGazeHoverOver),
+  VRJS_PROP(CoreModel, onGazeHoverOut),
+  VRJS_PROP(CoreModel, onGestureTouchDown),
+  VRJS_PROP(CoreModel, onGestureTouchUp),
+  VRJS_PROP(CoreModel, onGestureTouchCancel),
+  JS_PS_END
+};
+
+CoreGeometry* VRJS_MEMBER(CoreModel, geometry, GetGeometry);
+OVR::GlProgram* VRJS_MEMBER(CoreModel, program, GetProgram);
+OVR::Matrix4f* VRJS_MEMBER(CoreModel, matrix, GetMatrix4f);
+OVR::Vector3f* VRJS_MEMBER(CoreModel, position, GetVector3f);
+OVR::Vector3f* VRJS_MEMBER(CoreModel, rotation, GetVector3f);
+OVR::Vector3f* VRJS_MEMBER(CoreModel, scale, GetVector3f);
+
+void SetMaybeValue(JSContext *cx, JS::MutableHandleValue vp, mozilla::Maybe<JS::PersistentRootedValue>& out) {
   out.reset();
   out.emplace(cx, vp);
-  return true;
+}
+
+void SetMaybeCallback(JSContext *cx, JS::RootedObject* opts, const char* name, JS::RootedObject* self, mozilla::Maybe<JS::PersistentRootedValue>& out) {
+  JS::RootedValue callbackVal(cx);
+  if (!JS_GetProperty(cx, *opts, name, &callbackVal) || callbackVal.isNullOrUndefined()) {
+    callbackVal = JS::RootedValue(cx, JS::NullValue());
+  }
+  if (callbackVal.isNullOrUndefined()) {
+    out.reset();
+  }
+  SetMaybeValue(cx, &callbackVal, out);
 }
 
 bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
@@ -153,20 +162,7 @@ bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
   return true;
 }
 
-bool _constructorCallback(JSContext *cx, JS::RootedObject* opts, const char* name, JS::RootedObject* self, mozilla::Maybe<JS::PersistentRootedValue>& out) {
-  JS::RootedValue callbackVal(cx);
-  if (!JS_GetProperty(cx, *opts, name, &callbackVal) || callbackVal.isNullOrUndefined()) {
-    callbackVal = JS::RootedValue(cx, JS::NullValue());
-  }
-  if (callbackVal.isNullOrUndefined()) {
-    out.reset();
-    return true;
-  }
-  if (!_setPersistentVal(cx, &callbackVal, out)) {
-    return false;
-  }
-  return true;
-}
+
 
 bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
@@ -190,10 +186,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 
   // Make sure we have a reference to self
   JS::RootedValue selfVal(cx, JS::ObjectOrNullValue(self));
-  if (!_setPersistentVal(cx, &selfVal, model->selfVal)) {
-    delete model;
-    return false;
-  }
+  SetMaybeValue(cx, &selfVal, model->selfVal);
 
   // Geometry
   JS::RootedValue geometry(cx);
@@ -206,10 +199,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &geometry, model->geometryVal)) {
-    delete model;
-    return false;
-  }
+  SetMaybeValue(cx, &geometry, model->geometryVal);
 
   // Program
   JS::RootedValue program(cx);
@@ -222,10 +212,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &program, model->programVal)) {
-    delete model;
-    return false;
-  }
+  SetMaybeValue(cx, &program, model->programVal);
 
   // Base transform matrix
   JS::RootedValue matrix(cx);
@@ -237,10 +224,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &matrix, model->matrixVal)) {
-    delete model;
-    return false;
-  }
+  SetMaybeValue(cx, &matrix, model->matrixVal);
 
   // Position
   JS::RootedValue position(cx);
@@ -252,10 +236,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &position, model->positionVal)) {
-    delete model;
-    return false;
-  }
+  SetMaybeValue(cx, &position, model->positionVal);
 
   // Rotation
   JS::RootedValue rotation(cx);
@@ -267,10 +248,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &rotation, model->rotationVal)) {
-    delete model;
-    return false;
-  }
+  SetMaybeValue(cx, &rotation, model->rotationVal);
 
   // Scale
   JS::RootedValue scale(cx);
@@ -282,36 +260,15 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  if (!_setPersistentVal(cx, &scale, model->scaleVal)) {
-    delete model;
-    return false;
-  }
+  SetMaybeValue(cx, &scale, model->scaleVal);
 
   // Callbacks
-  if (!_constructorCallback(cx, &opts, "onFrame", &self, model->onFrameVal)) {
-    delete model;
-    return false;
-  }
-  if (!_constructorCallback(cx, &opts, "onGazeHoverOver", &self, model->onGazeHoverOverVal)) {
-    delete model;
-    return false;
-  }
-  if (!_constructorCallback(cx, &opts, "onGazeHoverOut", &self, model->onGazeHoverOutVal)) {
-    delete model;
-    return false;
-  }
-  if (!_constructorCallback(cx, &opts, "onGestureTouchDown", &self, model->onGestureTouchDownVal)) {
-    delete model;
-    return false;
-  }
-  if (!_constructorCallback(cx, &opts, "onGestureTouchUp", &self, model->onGestureTouchUpVal)) {
-    delete model;
-    return false;
-  }
-  if (!_constructorCallback(cx, &opts, "onGestureTouchCancel", &self, model->onGestureTouchCancelVal)) {
-    delete model;
-    return false;
-  }
+  SetMaybeCallback(cx, &opts, "onFrame", &self, model->onFrameVal);
+  SetMaybeCallback(cx, &opts, "onGazeHoverOver", &self, model->onGazeHoverOverVal);
+  SetMaybeCallback(cx, &opts, "onGazeHoverOut", &self, model->onGazeHoverOutVal);
+  SetMaybeCallback(cx, &opts, "onGestureTouchDown", &self, model->onGestureTouchDownVal);
+  SetMaybeCallback(cx, &opts, "onGestureTouchUp", &self, model->onGestureTouchUpVal);
+  SetMaybeCallback(cx, &opts, "onGestureTouchCancel", &self, model->onGestureTouchCancelVal);
 
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));

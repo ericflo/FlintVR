@@ -224,8 +224,7 @@ CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject* global, JS::RootedObj
 
 	// TODO: Free this somewhere, it's a singleton now but who knows later
 	CoreScene* scene = new CoreScene();
-	SceneGraph* graph = new SceneGraph();
-	scene->graph = graph;
+	scene->graph = new SceneGraph();
 	scene->clearColor = new OVR::Vector4f();
 	JS::RootedObject sceneObj(cx, NewCoreScene(cx, scene));
 	JS::RootedValue sceneVal(cx, JS::ObjectOrNullValue(sceneObj));
