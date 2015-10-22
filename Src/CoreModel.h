@@ -2,6 +2,7 @@
 #define CORE_MODEL_H
 
 #include "BaseInclude.h"
+#include "Kernel/OVR_Geometry.h"
 #include "CoreGeometry.h"
 #include "CoreProgram.h"
 #include "CoreVector3f.h"
@@ -12,7 +13,8 @@ public:
 	int id;
   bool isHovered;
   bool isTouching;
-  OVR::Matrix4f* computedMatrix;
+  OVR::Matrix4f computedMatrix;
+  OVR::Array<JS::PersistentRootedValue> children;
 
   mozilla::Maybe<JS::PersistentRootedValue> selfVal;
 
@@ -38,10 +40,14 @@ public:
 
   CoreModel();
   ~CoreModel();
+  bool RemoveModel(JSContext* cx, CoreModel* model);
+  void ComputeMatrices(JSContext* cx, OVR::Matrix4f& transform);
+  void CallFrameCallbacks(JSContext* cx, JS::HandleValue ev);
+  void CallGazeCallbacks(JSContext* cx,  OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev);
+  void DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms);
   bool HasFrameCallback();
   bool HasGazeCallback();
   bool HasGestureCallback();
-  void ComputeMatrix(JSContext *cx);
 };
 
 void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);

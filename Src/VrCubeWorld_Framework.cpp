@@ -1,7 +1,6 @@
 #include "BaseInclude.h"
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
-#include "Kernel/OVR_Geometry.h"
 #include "SoundEffectContext.h"
 #include <memory>
 #include "CoreProgram.h"
@@ -11,7 +10,6 @@
 #include "CoreGeometry.h"
 #include "CoreModel.h"
 #include "CoreScene.h"
-#include "SceneGraph.h"
 
 #if 0
 	#define GL( func )		func; EglCheckErrors();
@@ -63,7 +61,7 @@ public:
 	virtual void		OneTimeInit( const char * fromPackage, const char * launchIntentJSON, const char * launchIntentURI );
 	virtual void		OneTimeShutdown();
 	virtual bool		OnKeyEvent( const int keyCode, const int repeatCount, const KeyEventType eventType );
-	virtual Matrix4f	Frame( const VrFrame & vrFrame );
+	virtual Matrix4f	Frame( const VrFrame& vrFrame );
 	virtual Matrix4f	DrawEyeView( const int eye, const float fovDegreesX, const float fovDegreesY, ovrFrameParms & frameParms );
 
 	ovrLocale &			GetLocale() { return *Locale; }
@@ -221,7 +219,7 @@ bool VrCubeWorld::OnKeyEvent( const int keyCode, const int repeatCount, const Ke
 	return false;
 }
 
-Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
+Matrix4f VrCubeWorld::Frame( const VrFrame& vrFrame )
 {
 	CenterEyeViewMatrix = vrapi_GetCenterEyeViewMatrix( &app->GetHeadModelParms(), &vrFrame.Tracking, NULL );
 
@@ -240,10 +238,6 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 		OVR::Vector3f* viewPos = new OVR::Vector3f( GetViewMatrixPosition( CenterEyeViewMatrix ) );
 		OVR::Vector3f* viewFwd = new OVR::Vector3f( GetViewMatrixForward( CenterEyeViewMatrix ) );
-
-		bool touchPressed = ( vrFrame.Input.buttonPressed & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
-		bool touchReleased = !touchPressed && ( vrFrame.Input.buttonReleased & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
-		bool touchDown = ( vrFrame.Input.buttonState & BUTTON_TOUCH ) != 0;
 
 		// Build the ev
 		JS::RootedObject ev(cx, JS_NewObject(cx, nullptr));
@@ -267,118 +261,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 		}
 		JS::RootedValue evValue(cx, JS::ObjectOrNullValue(ev));
 
-
-		// We're gonna have some rvals going on in here, guess we'll make one for reference
-		JS::RootedValue rval(cx);
-
-		// Compute each model's transform matrix
-		for (int i = 0; i < coreScene->graph->count(); ++i) {
-			CoreModel* model = coreScene->graph->at(i);
-			model->ComputeMatrix(cx);
-		}
-
-		// Call the frame callbacks
-		for (int i = 0; i < coreScene->graph->count(); ++i) {
-			CoreModel* model = coreScene->graph->at(i);
-			if (!model->HasFrameCallback()) {
-				continue;
-			}
-			JS::RootedObject modelSelf(cx, &model->selfVal->toObject());
-
-			JS::RootedValue callback(cx, model->onFrameVal.ref());
-			if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
-				__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onFrame callback\n");
-			}
-		}
-
-		// Call hover and collision callbacks
-		for (int i = 0; i < coreScene->graph->count(); ++i) {
-			CoreModel* model = coreScene->graph->at(i);
-			if (!model->HasGazeCallback() && !model->HasGestureCallback()) {
-				continue;
-			}
-			JS::RootedObject modelSelf(cx, &model->selfVal->toObject());
-
-			// Check for an intersection of one of the triangles of the model
-			bool foundIntersection = false;
-			OVR::Array<OVR::Vector3f> vertices = model->geometry(cx)->vertices->position;
-			for (int j = 0; j < model->geometry(cx)->indices.GetSizeI(); j += 3) {
-				OVR::Vector3f v0 = model->computedMatrix->Transform(vertices[model->geometry(cx)->indices[j]]);
-				OVR::Vector3f v1 = model->computedMatrix->Transform(vertices[model->geometry(cx)->indices[j + 1]]);
-				OVR::Vector3f v2 = model->computedMatrix->Transform(vertices[model->geometry(cx)->indices[j + 2]]);
-				float t0, u, v;
-				if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
-					foundIntersection = true;
-					break;
-				}
-				// Check the backface (is this necessary?)
-				if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v2, v1, v0, t0, u, v)) {
-					foundIntersection = true;
-					break;
-				}
-			}
-
-			JS::RootedValue callback(cx);
-
-			// If we found an intersection
-			if (foundIntersection) {
-
-				if (!model->isHovered) {
-					model->isHovered = true;
-					// Call the onGazeHoverOver callback
-					if (CallbackDefined(model->onGazeHoverOverVal)) {
-						callback = JS::RootedValue(cx, model->onGazeHoverOverVal.ref());
-						// TODO: Construct an object (with t0, u, v ?) to add to env
-						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
-							JS_ReportError(cx, "Could not call onGazeHoverOver callback");
-						}
-					}
-				}
-
-				if (!model->isTouching && touchPressed) {
-					model->isTouching = true;
-					// TODO: Construct an object (with t0, u, v ?) to add to env
-					if (CallbackDefined(model->onGestureTouchDownVal)) {
-						callback = JS::RootedValue(cx, model->onGestureTouchDownVal.ref());
-						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
-							JS_ReportError(cx, "Could not call onGestureTouchDown callback");
-						}
-					}
-				}
-
-				if ((model->isTouching && touchReleased) || (model->isTouching && !touchDown)) {
-					model->isTouching = false;
-					// TODO: Construct an object (with t0, u, v ?) to add to env
-					if (CallbackDefined(model->onGestureTouchUpVal)) {
-						callback = JS::RootedValue(cx, model->onGestureTouchUpVal.ref());
-						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
-							JS_ReportError(cx, "Could not call onGestureTouchUp callback");
-						}
-					}
-				}
-
-			} else {
-				if (model->isTouching) {
-					model->isTouching = false;
-					if (CallbackDefined(model->onGestureTouchCancelVal)) {
-						callback = JS::RootedValue(cx, model->onGestureTouchCancelVal.ref());
-						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
-							JS_ReportError(cx, "Could not call onGestureTouchCancel callback");
-						}
-					}
-				}
-
-				if (model->isHovered) {
-					model->isHovered = false;
-					if (CallbackDefined(model->onGazeHoverOutVal)) {
-						callback = JS::RootedValue(cx, model->onGazeHoverOutVal.ref());
-						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
-							JS_ReportError(cx, "Could not call onGazeHoverOut callback");
-						}
-					}
-				}
-			}
-		}
+		coreScene->ComputeMatrices(cx);
+		coreScene->CallFrameCallbacks(cx, evValue);
+		coreScene->CallGazeCallbacks(cx, viewPos, viewFwd, vrFrame, evValue);
 	}
 
 	// Update GUI systems last, but before rendering anything.
@@ -387,40 +272,18 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 	return CenterEyeViewMatrix;
 }
 
-Matrix4f VrCubeWorld::DrawEyeView( const int eye, const float fovDegreesX, const float fovDegreesY, ovrFrameParms & frameParms )
+Matrix4f VrCubeWorld::DrawEyeView( const int eye, const float fovDegreesX, const float fovDegreesY, ovrFrameParms& frameParms )
 {
 	const Matrix4f eyeViewMatrix = vrapi_GetEyeViewMatrix( &app->GetHeadModelParms(), &CenterEyeViewMatrix, eye );
 	const Matrix4f eyeProjectionMatrix = ovrMatrix4f_CreateProjectionFov( fovDegreesX, fovDegreesY, 0.0f, 0.0f, 0.2f, 0.0f );
 	const Matrix4f eyeViewProjection = eyeProjectionMatrix * eyeViewMatrix;
 
-	// Call the function returned from vrmain
+	// Call our scene's DrawEyeView
 	JSContext *cx = SpidermonkeyJSContext;
-
 	JS::RootedObject global(cx, SpidermonkeyGlobal.ref());
 	{
 		JSAutoCompartment ac(cx, global);
-
-		OVR::Vector4f* clearClr = coreScene->clearColor(cx);
-		GL( glClearColor(clearClr->x, clearClr->y, clearClr->z, clearClr->w) );
-		GL( glClear( GL_COLOR_BUFFER_BIT ) );
-
-		for (int i = 0; i < coreScene->graph->count(); ++i) {
-			CoreModel* model = coreScene->graph->at(i);
-			if (model == NULL) {
-				continue;
-			}
-
-			// Now submit the draw calls
-			GL( glUseProgram( model->program(cx)->program ) );
-			GL( glUniformMatrix4fv( model->program(cx)->uModel, 1, GL_TRUE, model->computedMatrix->M[0] ) );
-			GL( glUniformMatrix4fv( model->program(cx)->uView, 1, GL_TRUE, eyeViewMatrix.M[0] ) );
-			GL( glUniformMatrix4fv( model->program(cx)->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0] ) );
-			GL( glBindVertexArray( model->geometry(cx)->geometry->vertexArrayObject ) );
-			GL( glDrawElements( GL_TRIANGLES, model->geometry(cx)->geometry->indexCount, GL_UNSIGNED_SHORT, NULL ) );
-		}
-
-		GL( glBindVertexArray( 0 ) );
-		GL( glUseProgram( 0 ) );
+		coreScene->DrawEyeView(cx, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
 	}
 
 	GuiSys->RenderEyeView( CenterEyeViewMatrix, eyeViewProjection );

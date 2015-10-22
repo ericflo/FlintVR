@@ -7,10 +7,11 @@
 static int CURRENT_MODEL_ID = 1;
 
 CoreModel::CoreModel(void) :
-  id(CURRENT_MODEL_ID++),
   isHovered(false),
   isTouching(false),
-  computedMatrix(NULL) {
+  computedMatrix(),
+  children() {
+  id = CURRENT_MODEL_ID++;
 }
 
 CoreModel::~CoreModel(void) {
@@ -27,30 +28,43 @@ CoreModel::~CoreModel(void) {
   onGestureTouchDownVal.reset();
   onGestureTouchUpVal.reset();
   onGestureTouchCancelVal.reset();
-  delete computedMatrix;
 }
 
-bool CoreModel::HasFrameCallback() {
-  return CallbackDefined(onFrameVal);
+bool CoreModel::RemoveModel(JSContext* cx, CoreModel* model) {
+  // Find the index of the model to remove
+  int idx = -1;
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    if (child->id == model->id) {
+      idx = i;
+      break;
+    }
+  }
+
+  // If we found it, hooray
+  if (idx != -1) {
+    children.RemoveAt(idx);
+    return true;
+  }
+
+  // Otherwise, recurse
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    if (child->RemoveModel(cx, model)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
-bool CoreModel::HasGazeCallback() {
-  return CallbackDefined(onGazeHoverOverVal) || CallbackDefined(onGazeHoverOutVal);
-}
-
-bool CoreModel::HasGestureCallback() {
-  return (
-    CallbackDefined(onGestureTouchDownVal) ||
-    CallbackDefined(onGestureTouchUpVal) ||
-    CallbackDefined(onGestureTouchCancelVal)
-  );
-}
-
-void CoreModel::ComputeMatrix(JSContext *cx) {
+void CoreModel::ComputeMatrices(JSContext* cx, OVR::Matrix4f& transform) {
   OVR::Matrix4f mtx;
 
   OVR::Matrix4f* mat = matrix(cx);
-  if (mat != NULL) {
+  if (mat == NULL) {
     mtx = *mat;
   }
 
@@ -73,10 +87,153 @@ void CoreModel::ComputeMatrix(JSContext *cx) {
     mtx.SetTranslation(*pos);
   }
 
-  if (computedMatrix != NULL) {
-    delete computedMatrix;
+  computedMatrix = transform * mtx;
+
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->ComputeMatrices(cx, computedMatrix);
   }
-  computedMatrix = new OVR::Matrix4f(mtx);
+}
+
+void CoreModel::CallFrameCallbacks(JSContext* cx, JS::HandleValue ev) {
+  if (HasFrameCallback()) {
+    JS::RootedValue callback(cx, onFrameVal.ref());
+    JS::RootedObject modelSelf(cx, &selfVal->toObject());
+    JS::RootedValue rval(cx);
+    JS::RootedValue evVal(cx, ev);
+    if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evVal), &rval)) {
+      __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onFrame callback\n");
+    }
+  }
+
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->CallFrameCallbacks(cx, ev);
+  }
+}
+
+void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev) {
+  bool touchPressed = ( vrFrame.Input.buttonPressed & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
+  bool touchReleased = !touchPressed && ( vrFrame.Input.buttonReleased & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
+  bool touchDown = ( vrFrame.Input.buttonState & OVR::BUTTON_TOUCH ) != 0;
+
+  if (HasGazeCallback() || HasGestureCallback()) {
+    JS::RootedObject self(cx, &selfVal->toObject());
+    CoreGeometry* geom = geometry(cx);
+
+    bool foundIntersection = false;
+    OVR::Array<OVR::Vector3f> vertices = geom->vertices->position;
+    for (int j = 0; j < geom->indices.GetSizeI(); j += 3) {
+      OVR::Vector3f v0 = computedMatrix.Transform(vertices[geom->indices[j]]);
+      OVR::Vector3f v1 = computedMatrix.Transform(vertices[geom->indices[j + 1]]);
+      OVR::Vector3f v2 = computedMatrix.Transform(vertices[geom->indices[j + 2]]);
+      float t0, u, v;
+      if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
+        foundIntersection = true;
+        break;
+      }
+      // Check the backface
+      if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v2, v1, v0, t0, u, v)) {
+        foundIntersection = true;
+        break;
+      }
+    }
+
+    JS::RootedValue evVal(cx, ev);
+    JS::RootedValue rval(cx);
+    JS::RootedValue callback(cx);
+    if (foundIntersection) {
+      if (!isHovered) {
+        isHovered = true;
+        // Call the onGazeHoverOver callback
+        if (CallbackDefined(onGazeHoverOverVal)) {
+          callback = JS::RootedValue(cx, onGazeHoverOverVal.ref());
+          // TODO: Construct an object (with t0, u, v ?) to add to env
+          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+            JS_ReportError(cx, "Could not call onGazeHoverOver callback");
+          }
+        }
+      }
+
+      if (!isTouching && touchPressed) {
+        isTouching = true;
+        // TODO: Construct an object (with t0, u, v ?) to add to env
+        if (CallbackDefined(onGestureTouchDownVal)) {
+          callback = JS::RootedValue(cx, onGestureTouchDownVal.ref());
+          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+            JS_ReportError(cx, "Could not call onGestureTouchDown callback");
+          }
+        }
+      }
+
+      if ((isTouching && touchReleased) || (isTouching && !touchDown)) {
+        isTouching = false;
+        // TODO: Construct an object (with t0, u, v ?) to add to env
+        if (CallbackDefined(onGestureTouchUpVal)) {
+          callback = JS::RootedValue(cx, onGestureTouchUpVal.ref());
+          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+            //JS_ReportError(cx, "Could not call onGestureTouchUp callback");
+          }
+        }
+      }
+
+    } else {
+      if (isTouching) {
+        isTouching = false;
+        if (CallbackDefined(onGestureTouchCancelVal)) {
+          callback = JS::RootedValue(cx, onGestureTouchCancelVal.ref());
+          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+            JS_ReportError(cx, "Could not call onGestureTouchCancel callback");
+          }
+        }
+      }
+
+      if (isHovered) {
+        isHovered = false;
+        if (CallbackDefined(onGazeHoverOutVal)) {
+          callback = JS::RootedValue(cx, onGazeHoverOutVal.ref());
+          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+            JS_ReportError(cx, "Could not call onGazeHoverOut callback");
+          }
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->CallGazeCallbacks(cx, viewPos, viewFwd, vrFrame, ev);
+  }
+}
+
+void CoreModel::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms) {
+  OVR::GlProgram* prog = program(cx);
+  OVR::GlGeometry* geom = geometry(cx)->geometry;
+  glUseProgram(prog->program);
+  glUniformMatrix4fv(prog->uModel, 1, GL_TRUE, computedMatrix.M[0]);
+  glUniformMatrix4fv(prog->uView, 1, GL_TRUE, eyeViewMatrix.M[0]);
+  glUniformMatrix4fv(prog->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0]);
+  glBindVertexArray(geom->vertexArrayObject);
+  glDrawElements(GL_TRIANGLES, geom->indexCount, GL_UNSIGNED_SHORT, NULL);
+}
+
+bool CoreModel::HasFrameCallback() {
+  return CallbackDefined(onFrameVal);
+}
+
+bool CoreModel::HasGazeCallback() {
+  return CallbackDefined(onGazeHoverOverVal) || CallbackDefined(onGazeHoverOutVal);
+}
+
+bool CoreModel::HasGestureCallback() {
+  return (
+    CallbackDefined(onGestureTouchDownVal) ||
+    CallbackDefined(onGestureTouchUpVal) ||
+    CallbackDefined(onGestureTouchCancelVal)
+  );
 }
 
 static JSClass coreModelClass = {

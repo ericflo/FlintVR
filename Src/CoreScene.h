@@ -3,13 +3,12 @@
 
 #include "BaseInclude.h"
 #include "CoreModel.h"
-#include "SceneGraph.h"
 #include "CoreVector4f.h"
 #include "Kernel/OVR_Std.h"
 
 class CoreScene {
 public:
-  SceneGraph* graph;
+  OVR::Array<JS::PersistentRootedValue> children;
 
   // Would it make sense to wrap these all in an object?
   btDefaultCollisionConfiguration* collisionConfiguration;
@@ -23,6 +22,11 @@ public:
 
   CoreScene();
   ~CoreScene();
+  bool RemoveModel(JSContext* cx, CoreModel* model);
+  void ComputeMatrices(JSContext* cx);
+  void CallFrameCallbacks(JSContext* cx, JS::HandleValue ev);
+  void CallGazeCallbacks(JSContext* cx,  OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev);
+  void DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms);
 };
 
 CoreScene* SetupCoreScene(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core, JS::RootedObject *env);

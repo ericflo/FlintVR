@@ -15,7 +15,6 @@ LOCAL_SRC_FILES			  += ../../../Src/CoreScene.cpp
 LOCAL_SRC_FILES			  += ../../../Src/CoreVector3f.cpp
 LOCAL_SRC_FILES			  += ../../../Src/CoreVector4f.cpp
 LOCAL_SRC_FILES			  += ../../../Src/ParseVertexAttribs.cpp
-LOCAL_SRC_FILES			  += ../../../Src/SceneGraph.cpp
 LOCAL_SRC_FILES			  += ../../../Src/CoreModel.cpp
 LOCAL_SRC_FILES			  += ../../../Src/CoreMatrix4f.cpp
 LOCAL_SRC_FILES			  += ../../../Src/CoreCommon.cpp
