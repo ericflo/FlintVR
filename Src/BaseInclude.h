@@ -8,5 +8,6 @@
 #include "App.h"
 #include "GuiSys.h"
 #include "OVR_Locale.h"
+#include "CoreCommon.h"
 
 #endif

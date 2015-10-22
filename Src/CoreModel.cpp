@@ -67,41 +67,6 @@ static JSClass coreModelClass = {
   JSCLASS_HAS_PRIVATE    /* flags */
 };
 
-#define VRJS_GETSET(ClassName, name) \
-  static bool ClassName##_get_##name(JSContext *cx, unsigned argc, JS::Value *vp) { \
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp); \
-    JS::RootedObject self(cx, &args.thisv().toObject()); \
-    ClassName* model = Get##ClassName(self); \
-    args.rval().set(model == NULL || model->name##Val.isNothing() ? JS::NullValue() : model->name##Val.ref()); \
-    return true; \
-  } \
-  \
-  static bool ClassName##_set_##name(JSContext *cx, unsigned argc, JS::Value *vp) { \
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp); \
-    if (!args[0].isObject()) { \
-      JS_ReportError(cx, "Unexpected argument (expected ##name)"); \
-      return false; \
-    } \
-    JS::RootedObject self(cx, &args.thisv().toObject()); \
-    ClassName* model = Get##ClassName(self); \
-    mozilla::Maybe<JS::PersistentRootedValue>* val = &model->name##Val; \
-    val->reset(); \
-    val->emplace(cx, *vp); \
-    return true; \
-  }
-
-#define VRJS_PROP(ClassName, name) \
-  JS_PSGS(#name, ClassName##_get_##name, ClassName##_set_##name, JSPROP_PERMANENT)
-
-#define VRJS_MEMBER(ClassName, name, getter) \
-  ClassName::name(JSContext *cx) { \
-    if (name##Val.isNothing()) { \
-      return NULL; \
-    } \
-    JS::RootedObject obj(cx, &name##Val.ref().toObject()); \
-    return getter(obj); \
-  }
-
 VRJS_GETSET(CoreModel, geometry)
 VRJS_GETSET(CoreModel, program)
 VRJS_GETSET(CoreModel, matrix)
@@ -138,22 +103,6 @@ OVR::Vector3f* VRJS_MEMBER(CoreModel, position, GetVector3f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, rotation, GetVector3f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, scale, GetVector3f);
 
-void SetMaybeValue(JSContext *cx, JS::MutableHandleValue vp, mozilla::Maybe<JS::PersistentRootedValue>& out) {
-  out.reset();
-  out.emplace(cx, vp);
-}
-
-void SetMaybeCallback(JSContext *cx, JS::RootedObject* opts, const char* name, JS::RootedObject* self, mozilla::Maybe<JS::PersistentRootedValue>& out) {
-  JS::RootedValue callbackVal(cx);
-  if (!JS_GetProperty(cx, *opts, name, &callbackVal) || callbackVal.isNullOrUndefined()) {
-    callbackVal = JS::RootedValue(cx, JS::NullValue());
-  }
-  if (callbackVal.isNullOrUndefined()) {
-    out.reset();
-  }
-  SetMaybeValue(cx, &callbackVal, out);
-}
-
 bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
   if (!vp.isObject()) {
     JS_ReportError(cx, "Unexpected argument (expected object)");
@@ -161,8 +110,6 @@ bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
   }
   return true;
 }
-
-
 
 bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);

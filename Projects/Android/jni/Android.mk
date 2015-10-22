@@ -7,8 +7,18 @@ include $(CLEAR_VARS)
 
 include ../../../../../cflags.mk
 
-LOCAL_MODULE			:= vrcubeworld
-LOCAL_SRC_FILES			:= ../../../Src/VrCubeWorld_Framework.cpp ../../../Src/CoreGeometry.cpp ../../../Src/CoreProgram.cpp ../../../Src/CoreScene.cpp ../../../Src/CoreVector3f.cpp ../../../Src/CoreVector4f.cpp ../../../Src/ParseVertexAttribs.cpp ../../../Src/SceneGraph.cpp ../../../Src/CoreModel.cpp ../../../Src/CoreMatrix4f.cpp
+LOCAL_MODULE			:=   vrcubeworld
+LOCAL_SRC_FILES			:=   ../../../Src/VrCubeWorld_Framework.cpp
+LOCAL_SRC_FILES			  += ../../../Src/CoreGeometry.cpp
+LOCAL_SRC_FILES			  += ../../../Src/CoreProgram.cpp
+LOCAL_SRC_FILES			  += ../../../Src/CoreScene.cpp
+LOCAL_SRC_FILES			  += ../../../Src/CoreVector3f.cpp
+LOCAL_SRC_FILES			  += ../../../Src/CoreVector4f.cpp
+LOCAL_SRC_FILES			  += ../../../Src/ParseVertexAttribs.cpp
+LOCAL_SRC_FILES			  += ../../../Src/SceneGraph.cpp
+LOCAL_SRC_FILES			  += ../../../Src/CoreModel.cpp
+LOCAL_SRC_FILES			  += ../../../Src/CoreMatrix4f.cpp
+LOCAL_SRC_FILES			  += ../../../Src/CoreCommon.cpp
 LOCAL_STATIC_LIBRARIES	+= vrsound vrlocale vrgui vrappframework libovrkernel spidermonkey_static bullet_static
 LOCAL_SHARED_LIBRARIES	+= vrapi libandroid mozglue-prebuilt
 LOCAL_LDLIBS            += -landroid
