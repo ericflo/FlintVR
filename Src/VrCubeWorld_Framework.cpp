@@ -1,15 +1,9 @@
-#include <android/log.h>
+#include "BaseInclude.h"
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
-#include "App.h"
-#include "GuiSys.h"
-#include "OVR_Locale.h"
 #include "Kernel/OVR_Geometry.h"
 #include "SoundEffectContext.h"
 #include <memory>
-#include "jsapi.h"
-#include "js/Conversions.h"
-#include <mozilla/Maybe.h>
 #include "CoreProgram.h"
 #include "CoreVector3f.h"
 #include "CoreVector4f.h"
@@ -18,9 +12,6 @@
 #include "CoreModel.h"
 #include "CoreScene.h"
 #include "SceneGraph.h"
-#include "bullet/btBulletCollisionCommon.h"
-
-inline int bullet_btInfinityMask(){ return btInfinityMask; } // Hack to work around bullet bug
 
 #if 0
 	#define GL( func )		func; EglCheckErrors();

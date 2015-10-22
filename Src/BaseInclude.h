@@ -9,5 +9,8 @@
 #include "GuiSys.h"
 #include "OVR_Locale.h"
 #include "CoreCommon.h"
+#include "bullet/btBulletDynamicsCommon.h"
+
+inline int bullet_btInfinityMask(){ return btInfinityMask; } // Hack to work around bullet bug
 
 #endif
