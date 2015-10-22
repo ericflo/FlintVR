@@ -11,6 +11,13 @@ class CoreScene {
 public:
   SceneGraph* graph;
 
+  // Would it make sense to wrap these all in an object?
+  btDefaultCollisionConfiguration* collisionConfiguration;
+  btCollisionDispatcher* dispatcher;
+  btBroadphaseInterface* overlappingPairCache;
+  btSequentialImpulseConstraintSolver* solver;
+  btDiscreteDynamicsWorld* dynamicsWorld;
+
   OVR::Vector4f* clearColor(JSContext *cx);
   mozilla::Maybe<JS::PersistentRootedValue> clearColorVal;
 

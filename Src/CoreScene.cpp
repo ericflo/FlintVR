@@ -6,11 +6,24 @@
 
 CoreScene::CoreScene(void) {
 	graph = new SceneGraph();
+
+	collisionConfiguration = new btDefaultCollisionConfiguration();
+	dispatcher = new	btCollisionDispatcher(collisionConfiguration);
+	overlappingPairCache = new btDbvtBroadphase();
+	solver = new btSequentialImpulseConstraintSolver;
+	dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache,
+		solver, collisionConfiguration);
 }
 
 CoreScene::~CoreScene(void) {
 	clearColorVal.reset();
 	delete graph;
+
+	delete dynamicsWorld;
+	delete solver;
+	delete overlappingPairCache;
+	delete dispatcher;
+	delete collisionConfiguration;
 }
 
 OVR::Vector4f* VRJS_MEMBER(CoreScene, clearColor, GetVector4f);
