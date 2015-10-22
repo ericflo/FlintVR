@@ -13,7 +13,8 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext *cx, JS::HandleValue val) {
   }
   JS::RootedObject verticesObj(cx, &val.toObject());
   // Check that the single argument is an array object
-  if (!JS_IsArrayObject(cx, val)) {
+  bool isArray;
+  if (!JS_IsArrayObject(cx, val, &isArray) || !isArray) {
     JS_ReportError(cx, "Vertices must be an array");
     return NULL;
   }
@@ -25,7 +26,7 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext *cx, JS::HandleValue val) {
     return NULL;
   }
 
-  OVR::VertexAttribs* attribs = new OVR::VertexAttribs;
+  OVR::VertexAttribs* attribs = new OVR::VertexAttribs();
   bool metadataPhase = true;
   size_t vertexComponents = 0;
   int indices[MAX_COMPONENT_COUNT];

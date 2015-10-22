@@ -1,6 +1,8 @@
 #include "SceneGraph.h"
 
-SceneGraph::SceneGraph(void) {
+SceneGraph::SceneGraph(void) :
+  _count(0),
+  _capacity(0) {
 	resize();
 }
 

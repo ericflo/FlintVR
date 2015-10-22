@@ -12,7 +12,9 @@ public:
 	int id;
   bool isHovered;
   bool isTouching;
-  OVR::Matrix4f* computedMatrix = NULL;
+  OVR::Matrix4f* computedMatrix;
+
+  mozilla::Maybe<JS::PersistentRootedValue> selfVal;
 
   CoreGeometry* geometry(JSContext *cx);
   OVR::GlProgram* program(JSContext *cx);
@@ -20,7 +22,6 @@ public:
   OVR::Vector3f* position(JSContext *cx);
   OVR::Vector3f* rotation(JSContext *cx);
   OVR::Vector3f* scale(JSContext *cx);
-
   mozilla::Maybe<JS::PersistentRootedValue> geometryVal;
   mozilla::Maybe<JS::PersistentRootedValue> programVal;
   mozilla::Maybe<JS::PersistentRootedValue> matrixVal;
@@ -35,13 +36,17 @@ public:
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchUpVal;
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancelVal;
 
+  CoreModel();
+  bool HasFrameCallback();
+  bool HasGazeCallback();
+  bool HasGestureCallback();
   void ComputeMatrix(JSContext *cx);
 };
-
-int GetNextModelId();
 
 void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);
 JSObject* NewCoreModel(JSContext *cx, CoreModel* model);
 CoreModel* GetCoreModel(JS::HandleObject obj);
+
+bool CallbackDefined(mozilla::Maybe<JS::PersistentRootedValue>& val);
 
 #endif

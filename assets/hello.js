@@ -2,9 +2,9 @@ var STARFIELD_COUNT = 4000;
 var STARFIELD_NEAR = 600;
 var STARFIELD_FAR = 2000;
 
-var CUBE_ROWS = 10;
-var CUBE_COLS = 10;
-var CUBE_LAYERS = 3;
+var CUBE_ROWS = 7;
+var CUBE_COLS = 7;
+var CUBE_LAYERS = 1;
 
 function vrmain(env) {
   var Geometry        = env.core.Geometry;

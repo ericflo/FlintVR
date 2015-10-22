@@ -6,19 +6,7 @@
 
 static JSClass coreProgramClass = {
 	"Program",              /* name */
-	JSCLASS_HAS_PRIVATE,    /* flags */
-	JS_PropertyStub,        /* addProperty (JSPropertyOp) */
-	JS_DeletePropertyStub,  /* delProperty (JSDeletePropertyOp) */
-	JS_PropertyStub,        /* getProperty (JSPropertyOp) */
-	JS_StrictPropertyStub,  /* setProperty (JSStrictPropertyOp) */
-	JS_EnumerateStub,       /* enumerate   (JSEnumerateOp) */
-	JS_ResolveStub,         /* resolve     (JSResolveOp) */
-	JS_ConvertStub,         /* convert     (JSConvertOp) */
-	NULL,                   /* finalize    (FinalizeOpType) */
-	NULL,                   /* call        (JSNative) */
-	NULL,                   /* hasInstance (JSHasInstanceOp) */
-	NULL,                   /* construct   (JSNative) */
-	NULL                    /* trace       (JSTraceOp) */
+	JSCLASS_HAS_PRIVATE    /* flags */
 };
 
 OVR::GlProgram* GetProgram(JS::HandleObject obj) {
@@ -46,7 +34,7 @@ bool CoreProgram_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	JS::RootedString fragment(cx, JS::ToString(cx, args[1]));
 
 	// Go ahead and create our self object and attach the vertex and fragment shaders passed by the user
-	JS::RootedObject self(cx, JS_NewObject(cx, &coreProgramClass, JS::NullPtr(), JS::NullPtr()));
+	JS::RootedObject self(cx, JS_NewObject(cx, &coreProgramClass));
 	if (!JS_SetProperty(cx, self, "vertex", args[0])) {
 		__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not set program.vertex\n");
 		JS_ReportError(cx, "Could not set program.vertex");
@@ -90,7 +78,7 @@ bool CoreProgram_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	delete[] fragmentBuf;
 
 	// Make a copy of the GlProgram on the heap so we can put in private storage
-	OVR::GlProgram* heapProgram = new OVR::GlProgram;
+	OVR::GlProgram* heapProgram = new OVR::GlProgram();
 	heapProgram->program = program.program;
 	heapProgram->vertexShader = program.vertexShader;
 	heapProgram->uMvp = program.uMvp;

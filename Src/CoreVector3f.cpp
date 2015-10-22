@@ -6,23 +6,11 @@
 
 static JSClass coreVector3fClass = {
 	"Vector3f",             /* name */
-	JSCLASS_HAS_PRIVATE,    /* flags */
-	JS_PropertyStub,        /* addProperty (JSPropertyOp) */
-	JS_DeletePropertyStub,  /* delProperty (JSDeletePropertyOp) */
-	JS_PropertyStub,        /* getProperty (JSPropertyOp) */
-	JS_StrictPropertyStub,  /* setProperty (JSStrictPropertyOp) */
-	JS_EnumerateStub,       /* enumerate   (JSEnumerateOp) */
-	JS_ResolveStub,         /* resolve     (JSResolveOp) */
-	JS_ConvertStub,         /* convert     (JSConvertOp) */
-	NULL,                   /* finalize    (FinalizeOpType) */
-	NULL,                   /* call        (JSNative) */
-	NULL,                   /* hasInstance (JSHasInstanceOp) */
-	NULL,                   /* construct   (JSNative) */
-	NULL                    /* trace       (JSTraceOp) */
+	JSCLASS_HAS_PRIVATE    /* flags */
 };
 
 JSObject* NewCoreVector3f(JSContext *cx, OVR::Vector3f* vector3f) {
-	JS::RootedObject self(cx, JS_NewObject(cx, &coreVector3fClass, JS::NullPtr(), JS::NullPtr()));
+	JS::RootedObject self(cx, JS_NewObject(cx, &coreVector3fClass));
 	if (!JS_DefineFunction(cx, self, "add", &CoreVector3f_add, 0, 0)) {
     JS_ReportError(cx, "Could not create vector3f.add function");
     return NULL;
@@ -69,8 +57,7 @@ bool CoreVector3f_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 		return false;
 	}
 
-	OVR::Vector3f* vector3f = new OVR::Vector3f;
-	vector3f->Set(x, y, z);
+	OVR::Vector3f* vector3f = new OVR::Vector3f(x, y, z);
 
 	// Go ahead and create our self object
 	JS::RootedObject self(cx, NewCoreVector3f(cx, vector3f));
@@ -117,7 +104,7 @@ bool _getVector3fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedStri
 	return true;
 }
 
-bool CoreVector3f_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool strict, JS::MutableHandleValue vp) {
+bool CoreVector3f_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp, JS::ObjectOpResult& result) {
 	if (JSID_IS_STRING(id)) {
 		JS::RootedString propertyName(cx, JSID_TO_STRING(id));
 		OVR::Vector3f* vector3f = GetVector3f(obj);

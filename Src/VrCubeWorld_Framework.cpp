@@ -1,14 +1,3 @@
-/************************************************************************************
-
-Filename	:	VrCubeWorld_Framework.cpp
-Content		:	This sample uses the application framework.
-Created		:	March, 2015
-Authors		:	J.M.P. van Waveren
-
-Copyright	:	Copyright 2015 Oculus VR, LLC. All Rights reserved.
-
-*************************************************************************************/
-
 #include <android/log.h>
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
@@ -19,6 +8,7 @@ Copyright	:	Copyright 2015 Oculus VR, LLC. All Rights reserved.
 #include "SoundEffectContext.h"
 #include <memory>
 #include "jsapi.h"
+#include "js/Conversions.h"
 #include <mozilla/Maybe.h>
 #include "CoreProgram.h"
 #include "CoreVector3f.h"
@@ -100,20 +90,13 @@ private:
 	mozilla::Maybe<JS::PersistentRootedObject> SpidermonkeyGlobal;
 	float				RandomFloat();
 	CoreScene* coreScene;
+	mozilla::Maybe<JS::CompileOptions> CompileOptions;
 };
 
 // Build global JS object
 static JSClass globalClass = {
     "global",
-    JSCLASS_GLOBAL_FLAGS,
-    // [SpiderMonkey 38] Following Stubs are removed. Remove those lines.
-    JS_PropertyStub,
-    JS_DeletePropertyStub,
-    JS_PropertyStub,
-    JS_StrictPropertyStub,
-    JS_EnumerateStub,
-    JS_ResolveStub,
-    JS_ConvertStub
+    JSCLASS_GLOBAL_FLAGS
 };
 
 VrCubeWorld::VrCubeWorld(AAssetManager *assetManager) :
@@ -151,7 +134,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 	GetLocale().GetString( "@string/font_name", "efigs.fnt", fontName );
 	GuiSys->Init( this->app, *SoundEffectPlayer, fontName.ToCStr(), &app->GetDebugLines() );
 
-	//app->SetShowFPS(true);
+	app->SetShowFPS(true);
 
 	// Load the hello.js script into memory
 	const char* filename = "hello.js";
@@ -165,8 +148,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 	JS_Init();
 
 	// Set up the JS runtime and context
-	//SpidermonkeyJSRuntime = JS_NewRuntime(32L * 1024 * 1024); // Garbage collect at 32MB
-	SpidermonkeyJSRuntime = JS_NewRuntime(512L * 1024); // Garbage collect at 512KB
+	SpidermonkeyJSRuntime = JS_NewRuntime(32L * 1024 * 1024); // Garbage collect at 32MB
 	if (!SpidermonkeyJSRuntime) {
 		return;
 	}
@@ -176,7 +158,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 	}
 	JSContext *cx = SpidermonkeyJSContext;
 
-	JS_SetErrorReporter(cx, reportError);
+	JS_SetErrorReporter(SpidermonkeyJSRuntime, reportError);
 
 	// Create the global JS object
 	JS::RootedObject global(cx, JS::PersistentRootedObject(cx, JS_NewGlobalObject(cx, &globalClass, nullptr, JS::FireOnNewGlobalHook)));
@@ -187,15 +169,16 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 		JS_InitStandardClasses(cx, global);
 
 		// Compile and execute the script that should export vrmain
-		int lineno = 1;
-		bool ok = JS_EvaluateScript(cx, global, (const char*)AAsset_getBuffer(asset), AAsset_getLength(asset), filename, lineno, &rval);
+		CompileOptions.emplace(cx);
+		bool ok = JS::Evaluate(cx, CompileOptions.ref(), (const char*)AAsset_getBuffer(asset), AAsset_getLength(asset), &rval);
 		AAsset_close(asset);
 		if (!ok) {
+			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not evaluate script");
 			app->ShowInfoText(ERROR_DISPLAY_SECONDS, "Could not evaluate script");
 		}
 
 		// Build the environment to send to vrmain
-		JS::RootedObject core(cx, JS_NewObject(cx, nullptr, JS::NullPtr(), JS::NullPtr()));
+		JS::RootedObject core(cx, JS_NewObject(cx, nullptr));
 		JS::RootedValue coreValue(cx, JS::ObjectOrNullValue(core));
 		SetupCoreProgram(cx, &global, &core);
 		SetupCoreVector3f(cx, &global, &core);
@@ -203,7 +186,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 		SetupCoreMatrix4f(cx, &global, &core);
 		SetupCoreGeometry(cx, &global, &core);
 		SetupCoreModel(cx, &global, &core);
-		JS::RootedObject env(cx, JS_NewObject(cx, nullptr, JS::NullPtr(), JS::NullPtr()));
+		JS::RootedObject env(cx, JS_NewObject(cx, nullptr));
 		coreScene = SetupCoreScene(cx, &global, &core, &env);
 		if (!JS_SetProperty(cx, env, "core", coreValue)) {
 			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core\n");
@@ -219,11 +202,9 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 			}
 		}
 
-		SpidermonkeyGlobal.destroyIfConstructed();
-		SpidermonkeyGlobal.construct(SpidermonkeyJSRuntime, global);
+		SpidermonkeyGlobal.reset();
+		SpidermonkeyGlobal.emplace(cx, global);
 	}
-
-	__android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "Done setting up\n");
 }
 
 void VrCubeWorld::OneTimeShutdown()
@@ -253,13 +234,6 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 {
 	CenterEyeViewMatrix = vrapi_GetCenterEyeViewMatrix( &app->GetHeadModelParms(), &vrFrame.Tracking, NULL );
 
-	OVR::Vector3f* viewPos = new OVR::Vector3f( GetViewMatrixPosition( CenterEyeViewMatrix ) );
-	OVR::Vector3f* viewFwd = new OVR::Vector3f( GetViewMatrixForward( CenterEyeViewMatrix ) );
-
-	bool touchPressed = ( vrFrame.Input.buttonPressed & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
-	bool touchReleased = !touchPressed && ( vrFrame.Input.buttonReleased & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
-	bool touchDown = ( vrFrame.Input.buttonState & BUTTON_TOUCH ) != 0;
-
 	// Show any errors
 	if (!LATEST_ERROR.IsEmpty()) {
 		app->ShowInfoText(ERROR_DISPLAY_SECONDS, "%s", LATEST_ERROR.ToCStr());
@@ -273,8 +247,15 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 	{
 		JSAutoCompartment ac(cx, global);
 
+		OVR::Vector3f* viewPos = new OVR::Vector3f( GetViewMatrixPosition( CenterEyeViewMatrix ) );
+		OVR::Vector3f* viewFwd = new OVR::Vector3f( GetViewMatrixForward( CenterEyeViewMatrix ) );
+
+		bool touchPressed = ( vrFrame.Input.buttonPressed & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
+		bool touchReleased = !touchPressed && ( vrFrame.Input.buttonReleased & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
+		bool touchDown = ( vrFrame.Input.buttonState & BUTTON_TOUCH ) != 0;
+
 		// Build the ev
-		JS::RootedObject ev(cx, JS_NewObject(cx, nullptr, JS::NullPtr(), JS::NullPtr()));
+		JS::RootedObject ev(cx, JS_NewObject(cx, nullptr));
 		JS::RootedValue viewPosVal(cx, JS::ObjectOrNullValue(NewCoreVector3f(cx, viewPos)));
 		if (!JS_SetProperty(cx, ev, "viewPos", viewPosVal)) {
 			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not set ev.viewPos\n");
@@ -308,11 +289,13 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 		// Call the frame callbacks
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
 			CoreModel* model = coreScene->graph->at(i);
-			if (model->onFrameVal.empty()) {
+			if (!model->HasFrameCallback()) {
 				continue;
 			}
+			JS::RootedObject modelSelf(cx, &model->selfVal->toObject());
+
 			JS::RootedValue callback(cx, model->onFrameVal.ref());
-			if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
+			if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
 				__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call onFrame callback\n");
 			}
 		}
@@ -320,11 +303,10 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 		// Call hover and collision callbacks
 		for (int i = 0; i < coreScene->graph->count(); ++i) {
 			CoreModel* model = coreScene->graph->at(i);
-			if (model->onGazeHoverOverVal.empty() && model->onGazeHoverOutVal.empty() &&
-				  model->onGestureTouchDownVal.empty() && model->onGestureTouchUpVal.empty() &&
-				  model->onGestureTouchCancelVal.empty()) {
+			if (!model->HasGazeCallback() && !model->HasGestureCallback()) {
 				continue;
 			}
+			JS::RootedObject modelSelf(cx, &model->selfVal->toObject());
 
 			// Check for an intersection of one of the triangles of the model
 			bool foundIntersection = false;
@@ -353,10 +335,10 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 				if (!model->isHovered) {
 					model->isHovered = true;
 					// Call the onGazeHoverOver callback
-					if (!model->onGazeHoverOverVal.empty()) {
+					if (CallbackDefined(model->onGazeHoverOverVal)) {
 						callback = JS::RootedValue(cx, model->onGazeHoverOverVal.ref());
 						// TODO: Construct an object (with t0, u, v ?) to add to env
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
+						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
 							JS_ReportError(cx, "Could not call onGazeHoverOver callback");
 						}
 					}
@@ -365,9 +347,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 				if (!model->isTouching && touchPressed) {
 					model->isTouching = true;
 					// TODO: Construct an object (with t0, u, v ?) to add to env
-					if (!model->onGestureTouchDownVal.empty()) {
+					if (CallbackDefined(model->onGestureTouchDownVal)) {
 						callback = JS::RootedValue(cx, model->onGestureTouchDownVal.ref());
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
+						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
 							JS_ReportError(cx, "Could not call onGestureTouchDown callback");
 						}
 					}
@@ -376,9 +358,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 				if ((model->isTouching && touchReleased) || (model->isTouching && !touchDown)) {
 					model->isTouching = false;
 					// TODO: Construct an object (with t0, u, v ?) to add to env
-					if (!model->onGestureTouchUpVal.empty()) {
+					if (CallbackDefined(model->onGestureTouchUpVal)) {
 						callback = JS::RootedValue(cx, model->onGestureTouchUpVal.ref());
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
+						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
 							JS_ReportError(cx, "Could not call onGestureTouchUp callback");
 						}
 					}
@@ -387,9 +369,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 			} else {
 				if (model->isTouching) {
 					model->isTouching = false;
-					if (!model->onGestureTouchCancelVal.empty()) {
+					if (CallbackDefined(model->onGestureTouchCancelVal)) {
 						callback = JS::RootedValue(cx, model->onGestureTouchCancelVal.ref());
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
+						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
 							JS_ReportError(cx, "Could not call onGestureTouchCancel callback");
 						}
 					}
@@ -397,9 +379,9 @@ Matrix4f VrCubeWorld::Frame( const VrFrame & vrFrame )
 
 				if (model->isHovered) {
 					model->isHovered = false;
-					if (!model->onGazeHoverOutVal.empty()) {
+					if (CallbackDefined(model->onGazeHoverOutVal)) {
 						callback = JS::RootedValue(cx, model->onGazeHoverOutVal.ref());
-						if (!JS_CallFunctionValue(cx, global, callback, JS::HandleValueArray(evValue), &rval)) {
+						if (!JS_CallFunctionValue(cx, modelSelf, callback, JS::HandleValueArray(evValue), &rval)) {
 							JS_ReportError(cx, "Could not call onGazeHoverOut callback");
 						}
 					}

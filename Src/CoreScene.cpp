@@ -6,23 +6,11 @@
 
 static JSClass coreSceneClass = {
 	"Scene",                /* name */
-	JSCLASS_HAS_PRIVATE,    /* flags */
-	JS_PropertyStub,        /* addProperty (JSPropertyOp) */
-	JS_DeletePropertyStub,  /* delProperty (JSDeletePropertyOp) */
-	JS_PropertyStub,        /* getProperty (JSPropertyOp) */
-	JS_StrictPropertyStub,  /* setProperty (JSStrictPropertyOp) */
-	JS_EnumerateStub,       /* enumerate   (JSEnumerateOp) */
-	JS_ResolveStub,         /* resolve     (JSResolveOp) */
-	JS_ConvertStub,         /* convert     (JSConvertOp) */
-	NULL,                   /* finalize    (FinalizeOpType) */
-	NULL,                   /* call        (JSNative) */
-	NULL,                   /* hasInstance (JSHasInstanceOp) */
-	NULL,                   /* construct   (JSNative) */
-	NULL                    /* trace       (JSTraceOp) */
+	JSCLASS_HAS_PRIVATE    /* flags */
 };
 
 JSObject* NewCoreScene(JSContext *cx, CoreScene* scene) {
-	JS::RootedObject self(cx, JS_NewObject(cx, &coreSceneClass, JS::NullPtr(), JS::NullPtr()));
+	JS::RootedObject self(cx, JS_NewObject(cx, &coreSceneClass));
 	
 	JS_SetPrivate(self, (void *)scene);
 	
@@ -57,9 +45,9 @@ CoreScene* GetCoreScene(JS::HandleObject obj) {
 bool CoreScene_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
-	CoreScene* scene = new CoreScene;
-	scene->graph = new SceneGraph;
-	scene->clearColor = new OVR::Vector4f;
+	CoreScene* scene = new CoreScene();
+	scene->graph = new SceneGraph();
+	scene->clearColor = new OVR::Vector4f();
 	JS::RootedObject self(cx, NewCoreScene(cx, scene));	
 
 	args.rval().set(JS::ObjectOrNullValue(self));
@@ -155,7 +143,8 @@ bool CoreScene_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
 	OVR::String script;
 	script.Format("this.objects.splice(%d, 1)", idx);
 	const char* scriptStr = script.ToCStr();
-	if (!JS_EvaluateScript(cx, thisObj, scriptStr, OVR::OVR_strlen(scriptStr), "nofilename", 1, &rval)) {
+	JS::CompileOptions compileOpts(cx);
+	if (!JS::Evaluate(cx, compileOpts, scriptStr, OVR::OVR_strlen(scriptStr), &rval)) {
 		JS_ReportError(cx, "Could not evaluate model remove script");
 		return false;
 	}
@@ -198,14 +187,15 @@ bool Core_print(JSContext *cx, unsigned argc, JS::Value *vp) {
 	// Convert the argument to a string
 	JS::RootedString s(cx, JS::ToString(cx, args[0]));
 
-	size_t sLen = JS_GetStringLength(s) * sizeof(char);
-	char* sBuf = new char[sLen];
+	size_t sLen = JS_GetStringEncodingLength(cx, s) * sizeof(char);
+	char* sBuf = new char[sLen+1];
 	size_t sCopiedLen = JS_EncodeStringToBuffer(cx, s, sBuf, sLen);
 	if (sCopiedLen != sLen) {
 		delete[] sBuf;
 		JS_ReportError(cx, "Could not encode output");
 		return false;
 	}
+	sBuf[sLen] = '\0';
 
 	__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "PRINT: %s\n", sBuf);
 
@@ -233,9 +223,10 @@ CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject* global, JS::RootedObj
 	}
 
 	// TODO: Free this somewhere, it's a singleton now but who knows later
-	CoreScene* scene = new CoreScene;
-	scene->graph = new SceneGraph;
-	scene->clearColor = new OVR::Vector4f;
+	CoreScene* scene = new CoreScene();
+	SceneGraph* graph = new SceneGraph();
+	scene->graph = graph;
+	scene->clearColor = new OVR::Vector4f();
 	JS::RootedObject sceneObj(cx, NewCoreScene(cx, scene));
 	JS::RootedValue sceneVal(cx, JS::ObjectOrNullValue(sceneObj));
 	if (!JS_SetProperty(cx, *env, "scene", sceneVal)) {

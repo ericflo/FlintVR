@@ -6,23 +6,11 @@
 
 static JSClass coreMatrix4fClass = {
   "Matrix4f",             /* name */
-  JSCLASS_HAS_PRIVATE,    /* flags */
-  JS_PropertyStub,        /* addProperty (JSPropertyOp) */
-  JS_DeletePropertyStub,  /* delProperty (JSDeletePropertyOp) */
-  JS_PropertyStub,        /* getProperty (JSPropertyOp) */
-  JS_StrictPropertyStub,  /* setProperty (JSStrictPropertyOp) */
-  JS_EnumerateStub,       /* enumerate   (JSEnumerateOp) */
-  JS_ResolveStub,         /* resolve     (JSResolveOp) */
-  JS_ConvertStub,         /* convert     (JSConvertOp) */
-  NULL,                   /* finalize    (FinalizeOpType) */
-  NULL,                   /* call        (JSNative) */
-  NULL,                   /* hasInstance (JSHasInstanceOp) */
-  NULL,                   /* construct   (JSNative) */
-  NULL                    /* trace       (JSTraceOp) */
+  JSCLASS_HAS_PRIVATE    /* flags */
 };
 
 JSObject* NewCoreMatrix4f(JSContext *cx, OVR::Matrix4f* matrix4f) {
-  JS::RootedObject self(cx, JS_NewObject(cx, &coreMatrix4fClass, JS::NullPtr(), JS::NullPtr()));
+  JS::RootedObject self(cx, JS_NewObject(cx, &coreMatrix4fClass));
   if (!JS_DefineFunction(cx, self, "setTranslation", &CoreMatrix4f_setTranslation, 0, 0)) {
     JS_ReportError(cx, "Could not create matrix4f.setTranslation function");
     return NULL;
@@ -59,7 +47,7 @@ OVR::Matrix4f* GetMatrix4f(JS::HandleObject obj) {
 bool CoreMatrix4f_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
-  OVR::Matrix4f* matrix4f = new OVR::Matrix4f;
+  OVR::Matrix4f* matrix4f = new OVR::Matrix4f();
   JS::RootedObject self(cx, NewCoreMatrix4f(cx, matrix4f));
 
   // Return our self object

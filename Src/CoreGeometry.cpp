@@ -7,19 +7,7 @@
 
 static JSClass coreGeometryClass = {
 	"Geometry",             /* name */
-	JSCLASS_HAS_PRIVATE,    /* flags */
-	JS_PropertyStub,        /* addProperty (JSPropertyOp) */
-	JS_DeletePropertyStub,  /* delProperty (JSDeletePropertyOp) */
-	JS_PropertyStub,        /* getProperty (JSPropertyOp) */
-	JS_StrictPropertyStub,  /* setProperty (JSStrictPropertyOp) */
-	JS_EnumerateStub,       /* enumerate   (JSEnumerateOp) */
-	JS_ResolveStub,         /* resolve     (JSResolveOp) */
-	JS_ConvertStub,         /* convert     (JSConvertOp) */
-	NULL,                   /* finalize    (FinalizeOpType) */
-	NULL,                   /* call        (JSNative) */
-	NULL,                   /* hasInstance (JSHasInstanceOp) */
-	NULL,                   /* construct   (JSNative) */
-	NULL                    /* trace       (JSTraceOp) */
+	JSCLASS_HAS_PRIVATE    /* flags */
 };
 
 bool CoreGeometry_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
@@ -58,7 +46,8 @@ bool CoreGeometry_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 		JS_ReportError(cx, "Could not find 'indices' option");
 		return false;
 	}
-	if (!JS_IsArrayObject(cx, indices)) {
+	bool isArray;
+	if (!JS_IsArrayObject(cx, indices, &isArray) || !isArray) {
 		JS_ReportError(cx, "Expected indices to be an array object");
 		return false;
 	}
@@ -82,7 +71,7 @@ bool CoreGeometry_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	}
 
 	// Go ahead and create our self object
-	JS::RootedObject self(cx, JS_NewObject(cx, &coreGeometryClass, JS::NullPtr(), JS::NullPtr()));
+	JS::RootedObject self(cx, JS_NewObject(cx, &coreGeometryClass));
 	if (!JS_SetProperty(cx, self, "vertices", vertices)) {
 		JS_ReportError(cx, "Could not set vertices property on geometry object");
 		return false;
@@ -93,7 +82,7 @@ bool CoreGeometry_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	}
 
 	// Now we create our geometry
-	CoreGeometry* geometry = new CoreGeometry;
+	CoreGeometry* geometry = new CoreGeometry();
 	geometry->geometry = new OVR::GlGeometry(*vert, idc);
 	geometry->vertices = vert;
 	geometry->indices = idc;

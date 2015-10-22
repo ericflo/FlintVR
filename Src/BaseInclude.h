@@ -3,6 +3,7 @@
 
 #include <android/log.h>
 #include "jsapi.h"
+#include "js/Conversions.h"
 #include <mozilla/Maybe.h>
 #include "App.h"
 #include "GuiSys.h"

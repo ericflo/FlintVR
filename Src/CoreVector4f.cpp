@@ -6,23 +6,11 @@
 
 static JSClass coreVector4fClass = {
 	"Vector4f",             /* name */
-	JSCLASS_HAS_PRIVATE,    /* flags */
-	JS_PropertyStub,        /* addProperty (JSPropertyOp) */
-	JS_DeletePropertyStub,  /* delProperty (JSDeletePropertyOp) */
-	JS_PropertyStub,        /* getProperty (JSPropertyOp) */
-	JS_StrictPropertyStub,  /* setProperty (JSStrictPropertyOp) */
-	JS_EnumerateStub,       /* enumerate   (JSEnumerateOp) */
-	JS_ResolveStub,         /* resolve     (JSResolveOp) */
-	JS_ConvertStub,         /* convert     (JSConvertOp) */
-	NULL,                   /* finalize    (FinalizeOpType) */
-	NULL,                   /* call        (JSNative) */
-	NULL,                   /* hasInstance (JSHasInstanceOp) */
-	NULL,                   /* construct   (JSNative) */
-	NULL                    /* trace       (JSTraceOp) */
+	JSCLASS_HAS_PRIVATE    /* flags */
 };
 
 JSObject* NewCoreVector4f(JSContext *cx, OVR::Vector4f* vector4f) {
-	JS::RootedObject self(cx, JS_NewObject(cx, &coreVector4fClass, JS::NullPtr(), JS::NullPtr()));
+	JS::RootedObject self(cx, JS_NewObject(cx, &coreVector4fClass));
 	JS_SetPrivate(self, (void *)vector4f);
 	return self;
 }
@@ -65,11 +53,7 @@ bool CoreVector4f_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 		return false;
 	}
 
-	OVR::Vector4f* vector4f = new OVR::Vector4f;
-	vector4f->x = x;
-	vector4f->y = y;
-	vector4f->z = z;
-	vector4f->w = w;
+	OVR::Vector4f* vector4f = new OVR::Vector4f(x, y, z, w);
 
 	// Go ahead and create our self object
 	JS::RootedObject self(cx, NewCoreVector4f(cx, vector4f));
@@ -116,7 +100,7 @@ bool _getVector4fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedStri
 	return true;
 }
 
-bool CoreVector4f_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool strict, JS::MutableHandleValue vp) {
+bool CoreVector4f_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp, JS::ObjectOpResult& result) {
 	if (JSID_IS_STRING(id)) {
 		JS::RootedString propertyName(cx, JSID_TO_STRING(id));
 		OVR::Vector4f* vector4f = GetVector4f(obj);
