@@ -195,9 +195,9 @@ bool CoreScene_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
-  // Read the model object in
   JS::RootedObject modelObj(cx, &args[0].toObject());
   CoreModel* model = GetCoreModel(modelObj);
+
   JS::RootedObject thisObj(cx, &args.thisv().toObject());
   CoreScene* scene = (CoreScene*)JS_GetPrivate(thisObj);
 

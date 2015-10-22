@@ -218,6 +218,12 @@ void CoreModel::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& e
   glUniformMatrix4fv(prog->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0]);
   glBindVertexArray(geom->vertexArrayObject);
   glDrawElements(GL_TRIANGLES, geom->indexCount, GL_UNSIGNED_SHORT, NULL);
+
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->DrawEyeView(cx, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
+  }
 }
 
 bool CoreModel::HasFrameCallback() {
@@ -375,7 +381,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   JS::RootedValue scale(cx);
   if (!JS_GetProperty(cx, opts, "scale", &scale) || scale.isNullOrUndefined()) {
     scale = JS::RootedValue(cx,
-      JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f())));
+      JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f(1, 1, 1))));
   }
   if (!_ensureObject(cx, &scale)) {
     delete model;
@@ -402,6 +408,56 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   delete model;
 }
 
+bool CoreModel_add(JSContext *cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+  // Check the arguments length
+  if (args.length() != 1) {
+    JS_ReportError(cx, "Wrong number of arguments: %d, was expecting: %d", argc, 1);
+    return false;
+  }
+  if (!args[0].isObject()) {
+    JS_ReportError(cx, "Expected add to take a model argument");
+    return false;
+  }
+
+  JS::PersistentRootedValue modelVal(cx, args[0]);
+
+  // Read the model object in
+  JS::RootedObject thisObj(cx, &args.thisv().toObject());
+  CoreModel* scene = (CoreModel*)JS_GetPrivate(thisObj);
+  scene->children.PushBack(modelVal);
+
+  return true;
+}
+
+bool CoreModel_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+  // Check the arguments length
+  if (args.length() != 1) {
+    JS_ReportError(cx, "Wrong number of arguments: %d, was expecting: %d", argc, 1);
+    return false;
+  }
+  if (!args[0].isObject()) {
+    JS_ReportError(cx, "Expected remove to take a model argument");
+    return false;
+  }
+
+  JS::RootedObject modelObj(cx, &args[0].toObject());
+  CoreModel* otherModel = GetCoreModel(modelObj);
+
+  JS::RootedObject thisObj(cx, &args.thisv().toObject());
+  CoreModel* thisModel = GetCoreModel(thisObj);
+
+  if (!thisModel->RemoveModel(cx, otherModel)) {
+    JS_ReportError(cx, "Could not find model to remove");
+    return false;
+  }
+
+  return true;
+}
+
 void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core) {
   coreModelClass.finalize = CoreModel_finalize;
   JSObject *obj = JS_InitClass(
@@ -425,6 +481,14 @@ JSObject* NewCoreModel(JSContext *cx, CoreModel* model) {
   JS::RootedObject self(cx, JS_NewObject(cx, &coreModelClass));
   if (!JS_DefineProperties(cx, self, CoreModel_props)) {
     __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on model\n");
+  }
+  if (!JS_DefineFunction(cx, self, "add", &CoreModel_add, 0, 0)) {
+    JS_ReportError(cx, "Could not create model.add function");
+    return NULL;
+  }
+  if (!JS_DefineFunction(cx, self, "remove", &CoreModel_remove, 0, 0)) {
+    JS_ReportError(cx, "Could not create model.remove function");
+    return NULL;
   }
   JS_SetPrivate(self, (void *)model);
   return self;
