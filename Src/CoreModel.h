@@ -37,6 +37,7 @@ public:
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancelVal;
 
   CoreModel();
+  ~CoreModel();
   bool HasFrameCallback();
   bool HasGazeCallback();
   bool HasGestureCallback();

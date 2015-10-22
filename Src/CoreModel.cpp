@@ -13,6 +13,23 @@ CoreModel::CoreModel(void) :
   computedMatrix(NULL) {
 }
 
+CoreModel::~CoreModel(void) {
+  selfVal.reset();
+  geometryVal.reset();
+  programVal.reset();
+  matrixVal.reset();
+  positionVal.reset();
+  rotationVal.reset();
+  scaleVal.reset();
+  onFrameVal.reset();
+  onGazeHoverOverVal.reset();
+  onGazeHoverOutVal.reset();
+  onGestureTouchDownVal.reset();
+  onGestureTouchUpVal.reset();
+  onGestureTouchCancelVal.reset();
+  delete computedMatrix;
+}
+
 bool CoreModel::HasFrameCallback() {
   return CallbackDefined(onFrameVal);
 }
@@ -225,20 +242,6 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
   JS_SetPrivate(obj, NULL);
-  model->selfVal.reset();
-  model->geometryVal.reset();
-  model->programVal.reset();
-  model->matrixVal.reset();
-  model->positionVal.reset();
-  model->rotationVal.reset();
-  model->scaleVal.reset();
-  model->onFrameVal.reset();
-  model->onGazeHoverOverVal.reset();
-  model->onGazeHoverOutVal.reset();
-  model->onGestureTouchDownVal.reset();
-  model->onGestureTouchUpVal.reset();
-  model->onGestureTouchCancelVal.reset();
-  delete model->computedMatrix;
   delete model;
 }
 

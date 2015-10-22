@@ -409,12 +409,8 @@ Matrix4f VrCubeWorld::DrawEyeView( const int eye, const float fovDegreesX, const
 	{
 		JSAutoCompartment ac(cx, global);
 
-		GL( glClearColor(
-			coreScene->clearColor->x,
-			coreScene->clearColor->y,
-			coreScene->clearColor->z,
-			coreScene->clearColor->w
-		) );
+		OVR::Vector4f* clearClr = coreScene->clearColor(cx);
+		GL( glClearColor(clearClr->x, clearClr->y, clearClr->z, clearClr->w) );
 		GL( glClear( GL_COLOR_BUFFER_BIT ) );
 
 		for (int i = 0; i < coreScene->graph->count(); ++i) {

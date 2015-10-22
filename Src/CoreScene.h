@@ -10,7 +10,12 @@
 class CoreScene {
 public:
   SceneGraph* graph;
-  OVR::Vector4f* clearColor;
+
+  OVR::Vector4f* clearColor(JSContext *cx);
+  mozilla::Maybe<JS::PersistentRootedValue> clearColorVal;
+
+  CoreScene();
+  ~CoreScene();
 };
 
 CoreScene* SetupCoreScene(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core, JS::RootedObject *env);

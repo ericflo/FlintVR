@@ -4,6 +4,24 @@
 #define LOG_COMPONENT "VrCubeWorld"
 #endif
 
+CoreScene::CoreScene(void) {
+	graph = new SceneGraph();
+}
+
+CoreScene::~CoreScene(void) {
+	clearColorVal.reset();
+	delete graph;
+}
+
+OVR::Vector4f* VRJS_MEMBER(CoreScene, clearColor, GetVector4f);
+
+VRJS_GETSET(CoreScene, clearColor)
+
+static JSPropertySpec CoreScene_props[] = {
+  VRJS_PROP(CoreScene, clearColor),
+  JS_PS_END
+};
+
 static JSClass coreSceneClass = {
 	"Scene",                /* name */
 	JSCLASS_HAS_PRIVATE    /* flags */
@@ -13,6 +31,10 @@ JSObject* NewCoreScene(JSContext *cx, CoreScene* scene) {
 	JS::RootedObject self(cx, JS_NewObject(cx, &coreSceneClass));
 	
 	JS_SetPrivate(self, (void *)scene);
+
+	if (!JS_DefineProperties(cx, self, CoreScene_props)) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on scene\n");
+  }
 	
 	if (!JS_DefineFunction(cx, self, "add", &CoreScene_add, 0, 0)) {
 		JS_ReportError(cx, "Could not create scene.add function");
@@ -45,20 +67,16 @@ CoreScene* GetCoreScene(JS::HandleObject obj) {
 bool CoreScene_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
-	CoreScene* scene = new CoreScene();
-	scene->graph = new SceneGraph();
-	scene->clearColor = new OVR::Vector4f();
-	JS::RootedObject self(cx, NewCoreScene(cx, scene));	
+	JS::RootedObject self(cx, NewCoreScene(cx, new CoreScene()));	
 
 	args.rval().set(JS::ObjectOrNullValue(self));
 	return true;
 }
 
 void CoreScene_finalize(JSFreeOp *fop, JSObject *obj) {
-	//CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
+	CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
 	JS_SetPrivate(obj, NULL);
-	// TODO: Only do this if the scene was passed in
-	//delete scene;
+	delete scene;
 }
 
 bool CoreScene_add(JSContext *cx, unsigned argc, JS::Value *vp) {
@@ -165,12 +183,10 @@ bool CoreScene_setClearColor(JSContext *cx, unsigned argc, JS::Value *vp) {
 		return false;
 	}
 
-	JS::RootedObject color(cx, &args[0].toObject());
-	OVR::Vector4f* colorVec = GetVector4f(color);
+	JS::RootedObject self(cx, &args.thisv().toObject());
+	CoreScene* scene = GetCoreScene(self);
 
-	JS::RootedObject thisObj(cx, &args.thisv().toObject());
-	CoreScene *scene = GetCoreScene(thisObj);
-	scene->clearColor = colorVec; // TODO: Does this work out memory management wise?
+	SetMaybeValue(cx, args[0], scene->clearColorVal);
 
 	return true;
 }
@@ -224,8 +240,6 @@ CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject* global, JS::RootedObj
 
 	// TODO: Free this somewhere, it's a singleton now but who knows later
 	CoreScene* scene = new CoreScene();
-	scene->graph = new SceneGraph();
-	scene->clearColor = new OVR::Vector4f();
 	JS::RootedObject sceneObj(cx, NewCoreScene(cx, scene));
 	JS::RootedValue sceneVal(cx, JS::ObjectOrNullValue(sceneObj));
 	if (!JS_SetProperty(cx, *env, "scene", sceneVal)) {
