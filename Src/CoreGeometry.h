@@ -9,10 +9,14 @@ public:
   OVR::GlGeometry* geometry;
   OVR::VertexAttribs* vertices;
   OVR::Array<OVR::TriangleIndex> indices;
+  btCollisionShape* collisionShape;
+
+  CoreGeometry(OVR::VertexAttribs* vert, OVR::Array<OVR::TriangleIndex> idc);
+  ~CoreGeometry();
 };
 
 void SetupCoreGeometry(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);
 //JSObject* NewCoreGeometry(JSContext *cx, OVR::GlGeometry *geometry);
-CoreGeometry* GetGeometry(JS::HandleObject obj);
+CoreGeometry* GetCoreGeometry(JS::HandleObject obj);
 
 #endif

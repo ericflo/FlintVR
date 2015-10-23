@@ -276,20 +276,12 @@ static JSPropertySpec CoreModel_props[] = {
   JS_PS_END
 };
 
-CoreGeometry* VRJS_MEMBER(CoreModel, geometry, GetGeometry);
+CoreGeometry* VRJS_MEMBER(CoreModel, geometry, GetCoreGeometry);
 OVR::GlProgram* VRJS_MEMBER(CoreModel, program, GetProgram);
 OVR::Matrix4f* VRJS_MEMBER(CoreModel, matrix, GetMatrix4f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, position, GetVector3f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, rotation, GetVector3f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, scale, GetVector3f);
-
-bool _ensureObject(JSContext *cx, JS::MutableHandleValue vp) {
-  if (!vp.isObject()) {
-    JS_ReportError(cx, "Unexpected argument (expected object)");
-    return false;
-  }
-  return true;
-}
 
 bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
@@ -322,7 +314,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  if (!_ensureObject(cx, &geometry)) {
+  if (!EnsureJSObject(cx, &geometry)) {
     delete model;
     return false;
   }
@@ -335,7 +327,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  if (!_ensureObject(cx, &program)) {
+  if (!EnsureJSObject(cx, &program)) {
     delete model;
     return false;
   }
@@ -347,7 +339,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     matrix = JS::RootedValue(cx,
       JS::ObjectOrNullValue(NewCoreMatrix4f(cx, new OVR::Matrix4f())));
   }
-  if (!_ensureObject(cx, &matrix)) {
+  if (!EnsureJSObject(cx, &matrix)) {
     delete model;
     return false;
   }
@@ -359,7 +351,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     position = JS::RootedValue(cx,
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f())));
   }
-  if (!_ensureObject(cx, &position)) {
+  if (!EnsureJSObject(cx, &position)) {
     delete model;
     return false;
   }
@@ -371,7 +363,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     rotation = JS::RootedValue(cx,
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f())));
   }
-  if (!_ensureObject(cx, &rotation)) {
+  if (!EnsureJSObject(cx, &rotation)) {
     delete model;
     return false;
   }
@@ -383,7 +375,7 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
     scale = JS::RootedValue(cx,
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f(1, 1, 1))));
   }
-  if (!_ensureObject(cx, &scale)) {
+  if (!EnsureJSObject(cx, &scale)) {
     delete model;
     return false;
   }

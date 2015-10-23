@@ -15,3 +15,11 @@ void SetMaybeCallback(JSContext *cx, JS::RootedObject* opts, const char* name, J
   }
   SetMaybeValue(cx, &callbackVal, out);
 }
+
+bool EnsureJSObject(JSContext *cx, JS::MutableHandleValue vp) {
+  if (!vp.isObject()) {
+    JS_ReportError(cx, "Unexpected argument (expected object)");
+    return false;
+  }
+  return true;
+}

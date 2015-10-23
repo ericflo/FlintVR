@@ -40,5 +40,6 @@
 
 void SetMaybeValue(JSContext *cx, JS::MutableHandleValue vp, mozilla::Maybe<JS::PersistentRootedValue>& out);
 void SetMaybeCallback(JSContext *cx, JS::RootedObject* opts, const char* name, JS::RootedObject* self, mozilla::Maybe<JS::PersistentRootedValue>& out);
+bool EnsureJSObject(JSContext *cx, JS::MutableHandleValue vp);
 
 #endif

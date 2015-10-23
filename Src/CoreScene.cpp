@@ -11,6 +11,7 @@ CoreScene::CoreScene(void) : children() {
   solver = new btSequentialImpulseConstraintSolver;
   dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache,
     solver, collisionConfiguration);
+  dynamicsWorld->setGravity(btVector3(0,-10,0)); // TODO: Remove me
 }
 
 CoreScene::~CoreScene(void) {
@@ -108,13 +109,17 @@ static JSClass coreSceneClass = {
 };
 
 JSObject* NewCoreScene(JSContext *cx, CoreScene* scene) {
-  JS::RootedObject self(cx, JS_NewObject(cx, &coreSceneClass));
-  
+  JS::RootedObject self(cx, JS_NewObject(cx, &coreSceneClass));  
   JS_SetPrivate(self, (void *)scene);
 
   if (!JS_DefineProperties(cx, self, CoreScene_props)) {
     __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on scene\n");
   }
+
+  // Set a white clear color by default
+  JS::RootedValue clearColor(cx, JS::ObjectOrNullValue(
+    NewCoreVector4f(cx, new OVR::Vector4f(1, 1, 1, 1))));
+  SetMaybeValue(cx, &clearColor, scene->clearColorVal);
   
   if (!JS_DefineFunction(cx, self, "add", &CoreScene_add, 0, 0)) {
     JS_ReportError(cx, "Could not create scene.add function");

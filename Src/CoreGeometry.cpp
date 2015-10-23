@@ -5,6 +5,30 @@
 #define LOG_COMPONENT "VrCubeWorld"
 #endif
 
+CoreGeometry::CoreGeometry(OVR::VertexAttribs* vert, OVR::Array<OVR::TriangleIndex> idc) {
+	geometry = new OVR::GlGeometry(*vert, idc);
+	vertices = vert;
+	indices = idc;
+	
+	btTriangleMesh* triMesh = new btTriangleMesh();
+	for (int i = 0; i < indices.GetSizeI(); i += 3) {
+		OVR::Vector3f v0 = vertices->position[indices[i]];
+    OVR::Vector3f v1 = vertices->position[indices[i + 1]];
+    OVR::Vector3f v2 = vertices->position[indices[i + 2]];
+		btVector3 v0Prime(v0.x, v0.y, v0.z);
+    btVector3 v1Prime(v1.x, v1.y, v1.z);
+    btVector3 v2Prime(v2.x, v2.y, v2.z);
+    triMesh->addTriangle(v0Prime, v1Prime, v2Prime);
+	}
+	collisionShape = new btBvhTriangleMeshShape(triMesh, true);
+}
+
+CoreGeometry::~CoreGeometry(void) {
+	delete collisionShape;
+	delete geometry;
+	delete vertices;
+}
+
 static JSClass coreGeometryClass = {
 	"Geometry",             /* name */
 	JSCLASS_HAS_PRIVATE    /* flags */
@@ -34,7 +58,7 @@ bool CoreGeometry_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	}
 
 	// TODO: Validate object type before casting
-	OVR::VertexAttribs *vert = ParseVertexAttribs(cx, vertices);
+	OVR::VertexAttribs* vert = ParseVertexAttribs(cx, vertices);
 	if (vert == NULL) {
 		// The parser reports the error
 		return false;
@@ -82,10 +106,7 @@ bool CoreGeometry_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	}
 
 	// Now we create our geometry
-	CoreGeometry* geometry = new CoreGeometry();
-	geometry->geometry = new OVR::GlGeometry(*vert, idc);
-	geometry->vertices = vert;
-	geometry->indices = idc;
+	CoreGeometry* geometry = new CoreGeometry(vert, idc);
 
 	// Store the geometry in the private data area
 	JS_SetPrivate(self, (void *)geometry);
@@ -103,12 +124,10 @@ bool CoreGeometry_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 void CoreGeometry_finalize(JSFreeOp *fop, JSObject *obj) {
 	CoreGeometry* geometry = (CoreGeometry*)JS_GetPrivate(obj);
 	JS_SetPrivate(obj, NULL);
-	delete geometry->geometry;
-	delete geometry->vertices;
 	delete geometry;
 }
 
-CoreGeometry* GetGeometry(JS::HandleObject obj) {
+CoreGeometry* GetCoreGeometry(JS::HandleObject obj) {
 	CoreGeometry* geometry = (CoreGeometry*)JS_GetPrivate(obj);
 	return geometry;
 }
