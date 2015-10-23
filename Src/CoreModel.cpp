@@ -251,15 +251,13 @@ btTransform CoreModel::GetTransform() {
   OVR::Vector3f translation = worldMatrix.GetTranslation();
   btTransform transform;
   transform.setIdentity();
-  transform.setOrigin(btVector3(translation.x, translation.y, translation.z));
-  return transform;
-  /*
-  return btTransform(btMatrix3x3(
+  transform.setBasis(btMatrix3x3(
     worldMatrix.M[0][0], worldMatrix.M[0][1], worldMatrix.M[0][2],
     worldMatrix.M[1][0], worldMatrix.M[1][1], worldMatrix.M[1][2],
     worldMatrix.M[2][0], worldMatrix.M[2][1], worldMatrix.M[2][2]
-  ), btVector3(translation.x, translation.y, translation.z));
-  */
+  ));
+  transform.setOrigin(btVector3(translation.x, translation.y, translation.z));
+  return transform;
 }
 
 void CoreModel::StartCollisions(JSContext *cx) {
