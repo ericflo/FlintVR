@@ -9,7 +9,6 @@ public:
   OVR::GlGeometry* geometry;
   OVR::VertexAttribs* vertices;
   OVR::Array<OVR::TriangleIndex> indices;
-  btCollisionShape* collisionShape;
 
   CoreGeometry(OVR::VertexAttribs* vert, OVR::Array<OVR::TriangleIndex> idc);
   ~CoreGeometry();

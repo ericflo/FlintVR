@@ -25,8 +25,11 @@ public:
   bool RemoveModel(JSContext* cx, CoreModel* model);
   void ComputeMatrices(JSContext* cx);
   void CallFrameCallbacks(JSContext* cx, JS::HandleValue ev);
-  void CallGazeCallbacks(JSContext* cx,  OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev);
+  void CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev);
+  void PerformCollisionDetection(JSContext* cx, double now, JS::HandleValue ev);
   void DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms);
+private:
+  double lastCollisionTick;
 };
 
 CoreScene* SetupCoreScene(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core, JS::RootedObject *env);

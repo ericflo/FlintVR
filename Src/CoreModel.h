@@ -8,15 +8,23 @@
 #include "CoreVector3f.h"
 #include "CoreMatrix4f.h"
 
+class CoreScene;
+
 class CoreModel {
 public:
 	int id;
   bool isHovered;
   bool isTouching;
-  OVR::Matrix4f computedMatrix;
+  OVR::Matrix4f localMatrix;
+  OVR::Matrix4f worldMatrix;
   OVR::Array<JS::PersistentRootedValue> children;
 
+  btTriangleMesh* triMesh;
+  btCollisionShape* collisionShape;
+  btCollisionObject* collisionObj;
+
   mozilla::Maybe<JS::PersistentRootedValue> selfVal;
+  CoreScene* scene;
 
   CoreGeometry* geometry(JSContext *cx);
   OVR::GlProgram* program(JSContext *cx);
@@ -48,6 +56,10 @@ public:
   bool HasFrameCallback();
   bool HasGazeCallback();
   bool HasGestureCallback();
+  btTransform GetTransform();
+  void StartCollisions(JSContext *cx);
+  void StopCollisions();
+  void UpdateCollisionObjects(JSContext *cx);
 };
 
 void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);

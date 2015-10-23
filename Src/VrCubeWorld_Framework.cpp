@@ -253,7 +253,8 @@ Matrix4f VrCubeWorld::Frame( const VrFrame& vrFrame )
 			JS_ReportError(cx, "Could not set ev.viewFwd");
 			return CenterEyeViewMatrix;
 		}
-		JS::RootedValue nowVal(cx, JS::NumberValue(vrapi_GetTimeInSeconds()));
+		double now = vrapi_GetTimeInSeconds();
+		JS::RootedValue nowVal(cx, JS::NumberValue(now));
 		if (!JS_SetProperty(cx, ev, "now", nowVal)) {
 			__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not set ev.now\n");
 			JS_ReportError(cx, "Could not set ev.now");
@@ -264,6 +265,7 @@ Matrix4f VrCubeWorld::Frame( const VrFrame& vrFrame )
 		coreScene->ComputeMatrices(cx);
 		coreScene->CallFrameCallbacks(cx, evValue);
 		coreScene->CallGazeCallbacks(cx, viewPos, viewFwd, vrFrame, evValue);
+		coreScene->PerformCollisionDetection(cx, now, evValue);
 	}
 
 	// Update GUI systems last, but before rendering anything.

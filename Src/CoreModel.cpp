@@ -1,4 +1,5 @@
 #include "CoreModel.h"
+#include "CoreScene.h"
 
 #ifndef LOG_COMPONENT
 #define LOG_COMPONENT "VrCubeWorld"
@@ -9,9 +10,11 @@ static int CURRENT_MODEL_ID = 1;
 CoreModel::CoreModel(void) :
   isHovered(false),
   isTouching(false),
-  computedMatrix(),
-  children() {
+  localMatrix(),
+  worldMatrix() {
   id = CURRENT_MODEL_ID++;
+  collisionShape = NULL;
+  collisionObj = NULL;
 }
 
 CoreModel::~CoreModel(void) {
@@ -28,6 +31,7 @@ CoreModel::~CoreModel(void) {
   onGestureTouchDownVal.reset();
   onGestureTouchUpVal.reset();
   onGestureTouchCancelVal.reset();
+  StopCollisions();
 }
 
 bool CoreModel::RemoveModel(JSContext* cx, CoreModel* model) {
@@ -87,12 +91,13 @@ void CoreModel::ComputeMatrices(JSContext* cx, OVR::Matrix4f& transform) {
     mtx.SetTranslation(*pos);
   }
 
-  computedMatrix = transform * mtx;
+  localMatrix = mtx;
+  worldMatrix = transform * mtx;
 
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
     CoreModel* child = GetCoreModel(childObj);
-    child->ComputeMatrices(cx, computedMatrix);
+    child->ComputeMatrices(cx, worldMatrix);
   }
 }
 
@@ -126,9 +131,9 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
     bool foundIntersection = false;
     OVR::Array<OVR::Vector3f> vertices = geom->vertices->position;
     for (int j = 0; j < geom->indices.GetSizeI(); j += 3) {
-      OVR::Vector3f v0 = computedMatrix.Transform(vertices[geom->indices[j]]);
-      OVR::Vector3f v1 = computedMatrix.Transform(vertices[geom->indices[j + 1]]);
-      OVR::Vector3f v2 = computedMatrix.Transform(vertices[geom->indices[j + 2]]);
+      OVR::Vector3f v0 = worldMatrix.Transform(vertices[geom->indices[j]]);
+      OVR::Vector3f v1 = worldMatrix.Transform(vertices[geom->indices[j + 1]]);
+      OVR::Vector3f v2 = worldMatrix.Transform(vertices[geom->indices[j + 2]]);
       float t0, u, v;
       if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
         foundIntersection = true;
@@ -213,7 +218,7 @@ void CoreModel::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& e
   OVR::GlProgram* prog = program(cx);
   OVR::GlGeometry* geom = geometry(cx)->geometry;
   glUseProgram(prog->program);
-  glUniformMatrix4fv(prog->uModel, 1, GL_TRUE, computedMatrix.M[0]);
+  glUniformMatrix4fv(prog->uModel, 1, GL_TRUE, worldMatrix.M[0]);
   glUniformMatrix4fv(prog->uView, 1, GL_TRUE, eyeViewMatrix.M[0]);
   glUniformMatrix4fv(prog->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0]);
   glBindVertexArray(geom->vertexArrayObject);
@@ -240,6 +245,97 @@ bool CoreModel::HasGestureCallback() {
     CallbackDefined(onGestureTouchUpVal) ||
     CallbackDefined(onGestureTouchCancelVal)
   );
+}
+
+btTransform CoreModel::GetTransform() {
+  OVR::Vector3f translation = worldMatrix.GetTranslation();
+  btTransform transform;
+  transform.setIdentity();
+  transform.setOrigin(btVector3(translation.x, translation.y, translation.z));
+  return transform;
+  /*
+  return btTransform(btMatrix3x3(
+    worldMatrix.M[0][0], worldMatrix.M[0][1], worldMatrix.M[0][2],
+    worldMatrix.M[1][0], worldMatrix.M[1][1], worldMatrix.M[1][2],
+    worldMatrix.M[2][0], worldMatrix.M[2][1], worldMatrix.M[2][2]
+  ), btVector3(translation.x, translation.y, translation.z));
+  */
+}
+
+void CoreModel::StartCollisions(JSContext *cx) {
+  if (collisionShape != NULL) {
+    delete collisionShape;
+    collisionShape = NULL;
+  }
+  if (collisionObj != NULL) {
+    delete collisionObj;
+    collisionObj = NULL;
+  }
+  // TODO: Ensure there are none missing
+
+  CoreGeometry *geom = geometry(cx);
+
+  triMesh = new btTriangleMesh();
+  for (int i = 0; i < geom->indices.GetSizeI(); i += 3) {
+    OVR::Vector3f v0 = geom->vertices->position[geom->indices[i]];
+    OVR::Vector3f v1 = geom->vertices->position[geom->indices[i + 1]];
+    OVR::Vector3f v2 = geom->vertices->position[geom->indices[i + 2]];
+    triMesh->addTriangle(
+      btVector3(v0.x, v0.y, v0.z),
+      btVector3(v1.x, v1.y, v1.z),
+      btVector3(v2.x, v2.y, v2.z)
+    );
+  }
+  collisionShape = new btConvexTriangleMeshShape(triMesh, true);
+
+  btRigidBody::btRigidBodyConstructionInfo rbInfo(btScalar(1.0), NULL,
+    collisionShape, btVector3(0, 0, 0));
+  btRigidBody* body = new btRigidBody(rbInfo);
+
+  scene->dynamicsWorld->addRigidBody(body);
+
+  collisionObj = static_cast<btCollisionObject*>(body);
+
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->StartCollisions(cx);
+  }
+}
+
+void CoreModel::StopCollisions() {
+  if (triMesh != NULL) {
+    delete triMesh;
+    triMesh = NULL;
+  }
+  if (collisionObj != NULL) {
+    if (scene != NULL && scene->dynamicsWorld != NULL) {
+      scene->dynamicsWorld->removeCollisionObject(collisionObj);
+    }
+    delete collisionObj;
+    collisionObj = NULL;
+  }
+  if (collisionShape != NULL) {
+    delete collisionShape;
+    collisionShape = NULL;
+  }
+  // TODO: Determine how to properly do this. We don't have access to cx.
+  /*
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->StopCollisions();
+  }
+  */
+}
+
+void CoreModel::UpdateCollisionObjects(JSContext *cx) {
+  collisionObj->setWorldTransform(GetTransform());
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->UpdateCollisionObjects(cx);
+  }
 }
 
 static JSClass coreModelClass = {
@@ -413,12 +509,21 @@ bool CoreModel_add(JSContext *cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
-  JS::PersistentRootedValue modelVal(cx, args[0]);
+  JS::RootedObject otherModelObj(cx, &args[0].toObject());
+  CoreModel* otherModel = GetCoreModel(otherModelObj);
 
   // Read the model object in
   JS::RootedObject thisObj(cx, &args.thisv().toObject());
-  CoreModel* scene = (CoreModel*)JS_GetPrivate(thisObj);
-  scene->children.PushBack(modelVal);
+  CoreModel* thisModel = GetCoreModel(thisObj);
+
+  // Annotate the scene object on the model
+  otherModel->scene = thisModel->scene;
+
+  // Make sure collision detection is set up and configured
+  otherModel->StartCollisions(cx);
+
+  JS::PersistentRootedValue modelVal(cx, args[0]);
+  thisModel->children.PushBack(modelVal);
 
   return true;
 }
@@ -436,11 +541,17 @@ bool CoreModel_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
-  JS::RootedObject modelObj(cx, &args[0].toObject());
-  CoreModel* otherModel = GetCoreModel(modelObj);
+  JS::RootedObject otherModelObj(cx, &args[0].toObject());
+  CoreModel* otherModel = GetCoreModel(otherModelObj);
 
   JS::RootedObject thisObj(cx, &args.thisv().toObject());
   CoreModel* thisModel = GetCoreModel(thisObj);
+
+  // Make sure collision detection is stopped
+  otherModel->StopCollisions();
+
+  // Remove the scene object from the model
+  otherModel->scene = nullptr;
 
   if (!thisModel->RemoveModel(cx, otherModel)) {
     JS_ReportError(cx, "Could not find model to remove");

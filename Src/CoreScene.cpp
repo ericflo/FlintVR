@@ -4,14 +4,15 @@
 #define LOG_COMPONENT "VrCubeWorld"
 #endif
 
-CoreScene::CoreScene(void) : children() {
+CoreScene::CoreScene(void) {
+  lastCollisionTick = 0;
   collisionConfiguration = new btDefaultCollisionConfiguration();
   dispatcher = new  btCollisionDispatcher(collisionConfiguration);
   overlappingPairCache = new btDbvtBroadphase();
   solver = new btSequentialImpulseConstraintSolver;
   dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache,
     solver, collisionConfiguration);
-  dynamicsWorld->setGravity(btVector3(0,-10,0)); // TODO: Remove me
+  //dynamicsWorld->setGravity(btVector3(0,-10,0)); // TODO: Remove me
 }
 
 CoreScene::~CoreScene(void) {
@@ -76,6 +77,38 @@ void CoreScene::CallGazeCallbacks(JSContext* cx,  OVR::Vector3f* viewPos, OVR::V
     CoreModel* child = GetCoreModel(childObj);
     child->CallGazeCallbacks(cx, viewPos, viewFwd, vrFrame, ev);
   }
+}
+
+void CoreScene::PerformCollisionDetection(JSContext* cx, double now, JS::HandleValue ev) {
+  // Update transforms
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->UpdateCollisionObjects(cx);
+  }
+
+  // Advance the simulation
+  btScalar tickTime = btScalar(1.0) / btScalar(60.0);
+  if (lastCollisionTick == 0) {
+    dynamicsWorld->stepSimulation(tickTime, 3, tickTime);
+  } else {
+    dynamicsWorld->stepSimulation(now - lastCollisionTick, 3, tickTime);
+  }
+  lastCollisionTick = now;
+
+  // Check for collisions
+  int numManifolds = dispatcher->getNumManifolds();
+  if (numManifolds > 0) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Contact detected %d %f\n", numManifolds, now);
+  }
+  /*
+  for (int i = 0; i < numManifolds; ++i) {
+    btPersistentManifold* contactManifold = dispatcher->getManifoldByIndexInternal(i);
+    const btCollisionObject* obA = static_cast<const btCollisionObject*>(contactManifold->getBody0());
+    const btCollisionObject* obB = static_cast<const btCollisionObject*>(contactManifold->getBody1());
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Contact detected obA(isNull):%d obB(isNull):%d\n", obA == NULL, obB == NULL);
+  }
+  */
 }
 
 void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms) {
@@ -177,11 +210,19 @@ bool CoreScene_add(JSContext *cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
-  JS::PersistentRootedValue modelVal(cx, args[0]);
+  JS::RootedObject modelObj(cx, &args[0].toObject());
+  CoreModel* model = GetCoreModel(modelObj);
 
-  // Read the model object in
   JS::RootedObject thisObj(cx, &args.thisv().toObject());
   CoreScene* scene = (CoreScene*)JS_GetPrivate(thisObj);
+
+  // Annotate the scene object on the model
+  model->scene = scene;
+
+  // Make sure collision detection is set up and configured
+  model->StartCollisions(cx);
+
+  JS::PersistentRootedValue modelVal(cx, args[0]);
   scene->children.PushBack(modelVal);
 
   return true;
@@ -205,6 +246,12 @@ bool CoreScene_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
 
   JS::RootedObject thisObj(cx, &args.thisv().toObject());
   CoreScene* scene = (CoreScene*)JS_GetPrivate(thisObj);
+
+  // Remove the scene object from the model
+  model->scene = nullptr;
+
+  // Make sure collision detection is stopped
+  model->StopCollisions();
 
   if (!scene->RemoveModel(cx, model)) {
     JS_ReportError(cx, "Could not find model to remove");
