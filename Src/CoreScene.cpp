@@ -98,17 +98,22 @@ void CoreScene::PerformCollisionDetection(JSContext* cx, double now, JS::HandleV
 
   // Check for collisions
   int numManifolds = dispatcher->getNumManifolds();
-  if (numManifolds > 0) {
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Contact detected %d %f\n", numManifolds, now);
-  }
-  /*
   for (int i = 0; i < numManifolds; ++i) {
     btPersistentManifold* contactManifold = dispatcher->getManifoldByIndexInternal(i);
     const btCollisionObject* obA = static_cast<const btCollisionObject*>(contactManifold->getBody0());
     const btCollisionObject* obB = static_cast<const btCollisionObject*>(contactManifold->getBody1());
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Contact detected obA(isNull):%d obB(isNull):%d\n", obA == NULL, obB == NULL);
+    CoreModel* modelA = ModelById(cx, obA->getUserIndex());
+    CoreModel* modelB = ModelById(cx, obB->getUserIndex());
+    modelA->CollidedWith(cx, modelB, ev);
+    modelB->CollidedWith(cx, modelA, ev);
   }
-  */
+
+  // Finish collision detection
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    child->FinishCollisions(cx, ev);
+  }
 }
 
 void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms) {
@@ -125,6 +130,19 @@ void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& e
 
   glBindVertexArray(0);
   glUseProgram(0);
+}
+
+// TODO: (PERF) Make this a hash lookup rather than a recursive search
+CoreModel* CoreScene::ModelById(JSContext *cx, int id) {
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    CoreModel* model = child->ModelById(cx, id);
+    if (model != NULL) {
+      return model;
+    }
+  }
+  return NULL;
 }
 
 OVR::Vector4f* VRJS_MEMBER(CoreScene, clearColor, GetVector4f);

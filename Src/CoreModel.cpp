@@ -31,6 +31,8 @@ CoreModel::~CoreModel(void) {
   onGestureTouchDownVal.reset();
   onGestureTouchUpVal.reset();
   onGestureTouchCancelVal.reset();
+  onCollideStartVal.reset();
+  onCollideEndVal.reset();
   StopCollisions();
 }
 
@@ -293,6 +295,7 @@ void CoreModel::StartCollisions(JSContext *cx) {
   scene->dynamicsWorld->addRigidBody(body);
 
   collisionObj = static_cast<btCollisionObject*>(body);
+  collisionObj->setUserIndex(id);
 
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
@@ -336,6 +339,80 @@ void CoreModel::UpdateCollisionObjects(JSContext *cx) {
   }
 }
 
+void CoreModel::CollidedWith(JSContext *cx, CoreModel* otherModel, JS::HandleValue ev) {
+  // Mark this id as seen
+  seenCollidingIds.PushBack(otherModel->id);
+
+  // First check to see if we're already colliding with 
+  for (int i = 0; i < collidingWithIds.GetSizeI(); ++i) {
+    if (collidingWithIds[i] == otherModel->id) {
+      return;
+    }
+  }
+
+  // If we made it here, it's a new collision, so trigger a callback
+  if (CallbackDefined(onCollideStartVal)) {
+    JS::RootedValue callback(cx, onCollideStartVal.ref());
+    JS::RootedValue rval(cx);
+    JS::RootedValue evVal(cx, ev);
+    JS::RootedObject selfObj(cx, &selfVal.ref().toObject());
+    if (!JS_CallFunctionValue(cx, selfObj, callback, JS::HandleValueArray(evVal), &rval)) {
+      JS_ReportError(cx, "Could not call onCollideStart callback");
+    }
+  }
+
+  // Now add this model's id to the colliding ids
+  collidingWithIds.PushBack(otherModel->id);
+}
+
+void CoreModel::FinishCollisions(JSContext *cx, JS::HandleValue ev) {
+  // TODO: Diff the seen and unseen collision ids and trigger collideEnd
+  //       callbacks, then clear seenCollidingIds.
+  for (int i = 0; i < collidingWithIds.GetSizeI(); ++i) {
+    bool found = false;
+    for (int j = 0; j < seenCollidingIds.GetSizeI(); ++j) {
+      if (collidingWithIds[i] == seenCollidingIds[j]) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      if (CallbackDefined(onCollideEndVal)) {
+        JS::RootedValue callback(cx, onCollideEndVal.ref());
+        //CoreModel* otherModel = scene->ModelById(cx, collidingWithIds[i]);
+        JS::RootedValue rval(cx);
+        JS::RootedValue evVal(cx, ev);
+        JS::RootedObject selfObj(cx, &selfVal.ref().toObject());
+        if (!JS_CallFunctionValue(cx, selfObj, callback, JS::HandleValueArray(evVal), &rval)) {
+          JS_ReportError(cx, "Could not call onCollideEnd callback");
+        }
+        break;
+      }
+    }
+  }
+
+  collidingWithIds = seenCollidingIds;
+  seenCollidingIds.Clear();
+}
+
+CoreModel* CoreModel::ModelById(JSContext *cx, int otherId) {
+  if (id == otherId) {
+    // FIXME: This is pretty gross, we're going the long way to get our own pointer
+    JS::RootedObject selfObj(cx, &selfVal.ref().toObject());
+    CoreModel* model = GetCoreModel(selfObj);
+    return model;
+  }
+  for (int i = 0; i < children.GetSizeI(); ++i) {
+    JS::RootedObject childObj(cx, &children[i].toObject());
+    CoreModel* child = GetCoreModel(childObj);
+    CoreModel* model = child->ModelById(cx, otherId);
+    if (model != NULL) {
+      return model;
+    }
+  }
+  return NULL;
+}
+
 static JSClass coreModelClass = {
   "Model",                /* name */
   JSCLASS_HAS_PRIVATE    /* flags */
@@ -353,6 +430,8 @@ VRJS_GETSET(CoreModel, onGazeHoverOut)
 VRJS_GETSET(CoreModel, onGestureTouchDown)
 VRJS_GETSET(CoreModel, onGestureTouchUp)
 VRJS_GETSET(CoreModel, onGestureTouchCancel)
+VRJS_GETSET(CoreModel, onCollideStart)
+VRJS_GETSET(CoreModel, onCollideEnd)
 
 static JSPropertySpec CoreModel_props[] = {
   VRJS_PROP(CoreModel, geometry),
@@ -367,6 +446,8 @@ static JSPropertySpec CoreModel_props[] = {
   VRJS_PROP(CoreModel, onGestureTouchDown),
   VRJS_PROP(CoreModel, onGestureTouchUp),
   VRJS_PROP(CoreModel, onGestureTouchCancel),
+  VRJS_PROP(CoreModel, onCollideStart),
+  VRJS_PROP(CoreModel, onCollideEnd),
   JS_PS_END
 };
 
@@ -482,6 +563,8 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   SetMaybeCallback(cx, &opts, "onGestureTouchDown", &self, model->onGestureTouchDownVal);
   SetMaybeCallback(cx, &opts, "onGestureTouchUp", &self, model->onGestureTouchUpVal);
   SetMaybeCallback(cx, &opts, "onGestureTouchCancel", &self, model->onGestureTouchCancelVal);
+  SetMaybeCallback(cx, &opts, "onCollideStart", &self, model->onCollideStartVal);
+  SetMaybeCallback(cx, &opts, "onCollideEnd", &self, model->onCollideEndVal);
 
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));

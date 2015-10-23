@@ -18,6 +18,8 @@ public:
   OVR::Matrix4f localMatrix;
   OVR::Matrix4f worldMatrix;
   OVR::Array<JS::PersistentRootedValue> children;
+  OVR::Array<int> collidingWithIds;
+  OVR::Array<int> seenCollidingIds;
 
   btTriangleMesh* triMesh;
   btCollisionShape* collisionShape;
@@ -45,6 +47,8 @@ public:
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchDownVal;
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchUpVal;
   mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancelVal;
+  mozilla::Maybe<JS::PersistentRootedValue> onCollideStartVal;
+  mozilla::Maybe<JS::PersistentRootedValue> onCollideEndVal;
 
   CoreModel();
   ~CoreModel();
@@ -60,6 +64,9 @@ public:
   void StartCollisions(JSContext *cx);
   void StopCollisions();
   void UpdateCollisionObjects(JSContext *cx);
+  void CollidedWith(JSContext *cx, CoreModel* otherModel, JS::HandleValue ev);
+  void FinishCollisions(JSContext *cx, JS::HandleValue ev);
+  CoreModel* ModelById(JSContext *cx, int otherId);
 };
 
 void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);

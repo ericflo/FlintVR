@@ -28,6 +28,7 @@ public:
   void CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev);
   void PerformCollisionDetection(JSContext* cx, double now, JS::HandleValue ev);
   void DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms);
+  CoreModel* ModelById(JSContext *cx, int id);
 private:
   double lastCollisionTick;
 };

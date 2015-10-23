@@ -65,6 +65,16 @@ function vrmain(env) {
       }
       var secondsElapsed = (ev.now - this._start); // Seconds
       this.position.x = Math.sin(secondsElapsed) * -10;
+    },
+    collideTag: "cube1",
+    collidesWith: ["cube2"],
+    onCollideStart: function(ev, other) {
+      this.position.y -= 1;
+      print("collideStart");
+    },
+    onCollideEnd: function(ev, other) {
+      this.position.y += 1;
+      print("collideEnd");
     }
   });
 
@@ -78,6 +88,14 @@ function vrmain(env) {
       }
       var secondsElapsed = (ev.now - this._start); // Seconds
       this.position.x = Math.sin(secondsElapsed) * 10;
+    },
+    collideTag: "cube2",
+    collidesWith: ["cube1"],
+    onCollideStart: function(ev, other) {
+      this.position.y -= 1;
+    },
+    onCollideEnd: function(ev, other) {
+      this.position.y += 1;
     }
   });
 
