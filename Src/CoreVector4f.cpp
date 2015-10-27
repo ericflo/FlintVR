@@ -9,7 +9,7 @@ static JSClass coreVector4fClass = {
 	JSCLASS_HAS_PRIVATE    /* flags */
 };
 
-JSObject* NewCoreVector4f(JSContext *cx, OVR::Vector4f* vector4f) {
+JSObject* NewCoreVector4f(JSContext* cx, OVR::Vector4f* vector4f) {
 	JS::RootedObject self(cx, JS_NewObject(cx, &coreVector4fClass));
 	JS_SetPrivate(self, (void *)vector4f);
 	return self;
@@ -20,7 +20,7 @@ OVR::Vector4f* GetVector4f(JS::HandleObject obj) {
 	return vector4f;
 }
 
-bool CoreVector4f_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreVector4f_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 	JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
 	// Check the arguments length
@@ -63,7 +63,7 @@ bool CoreVector4f_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	return true;
 }
 
-bool _setVector4fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* out) {
+bool _setVector4fVertex(JSContext* cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* out) {
 	bool match;
 	// TODO: Can we do this in a more efficient way than string scanning?! Maybe interned strings.
 	//       But first measure overhead, maybe this is fast enough.
@@ -86,7 +86,7 @@ bool _setVector4fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedStri
 	return true;
 }
 
-bool _getVector4fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* num) {
+bool _getVector4fVertex(JSContext* cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* num) {
 	bool match;
 	// TODO: Can we do this in a more efficient way than string scanning?! Maybe interned strings.
 	//       But first measure overhead, maybe this is fast enough.
@@ -100,7 +100,7 @@ bool _getVector4fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedStri
 	return true;
 }
 
-bool CoreVector4f_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp, JS::ObjectOpResult& result) {
+bool CoreVector4f_setProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp, JS::ObjectOpResult& result) {
 	if (JSID_IS_STRING(id)) {
 		JS::RootedString propertyName(cx, JSID_TO_STRING(id));
 		OVR::Vector4f* vector4f = GetVector4f(obj);
@@ -120,7 +120,7 @@ bool CoreVector4f_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId 
 	return true;
 }
 
-bool CoreVector4f_getProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp) {
+bool CoreVector4f_getProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp) {
 	if (JSID_IS_STRING(id)) {
 		JS::RootedString propertyName(cx, JSID_TO_STRING(id));
 		OVR::Vector4f* vector4f = GetVector4f(obj);
@@ -147,7 +147,7 @@ void CoreVector4f_finalize(JSFreeOp *fop, JSObject *obj) {
 	delete vector4f;
 }
 
-void SetupCoreVector4f(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core) {
+void SetupCoreVector4f(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
 	coreVector4fClass.finalize = CoreVector4f_finalize;
 	coreVector4fClass.setProperty = CoreVector4f_setProperty;
 	coreVector4fClass.getProperty = CoreVector4f_getProperty;

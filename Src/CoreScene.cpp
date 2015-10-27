@@ -133,7 +133,7 @@ void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& e
 }
 
 // TODO: (PERF) Make this a hash lookup rather than a recursive search
-CoreModel* CoreScene::ModelById(JSContext *cx, int id) {
+CoreModel* CoreScene::ModelById(JSContext* cx, int id) {
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
     CoreModel* child = GetCoreModel(childObj);
@@ -159,7 +159,7 @@ static JSClass coreSceneClass = {
   JSCLASS_HAS_PRIVATE    /* flags */
 };
 
-JSObject* NewCoreScene(JSContext *cx, CoreScene* scene) {
+JSObject* NewCoreScene(JSContext* cx, CoreScene* scene) {
   JS::RootedObject self(cx, JS_NewObject(cx, &coreSceneClass));  
   JS_SetPrivate(self, (void *)scene);
 
@@ -200,7 +200,7 @@ CoreScene* GetCoreScene(JS::HandleObject obj) {
   return scene;
 }
 
-bool CoreScene_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreScene_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   JS::RootedObject self(cx, NewCoreScene(cx, new CoreScene())); 
@@ -215,7 +215,7 @@ void CoreScene_finalize(JSFreeOp *fop, JSObject *obj) {
   delete scene;
 }
 
-bool CoreScene_add(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreScene_add(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   // Check the arguments length
@@ -246,7 +246,7 @@ bool CoreScene_add(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreScene_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreScene_remove(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   // Check the arguments length
@@ -279,7 +279,7 @@ bool CoreScene_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreScene_setClearColor(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreScene_setClearColor(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   // Check the arguments length
@@ -300,7 +300,7 @@ bool CoreScene_setClearColor(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool Core_print(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool Core_print(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   // Check the arguments length
@@ -308,24 +308,13 @@ bool Core_print(JSContext *cx, unsigned argc, JS::Value *vp) {
     JS_ReportError(cx, "Wrong number of arguments: %d, was expecting: %d", argc, 1);
     return false;
   }
-  
-  // Convert the argument to a string
-  JS::RootedString s(cx, JS::ToString(cx, args[0]));
 
-  size_t sLen = JS_GetStringEncodingLength(cx, s) * sizeof(char);
-  char* sBuf = new char[sLen+1];
-  size_t sCopiedLen = JS_EncodeStringToBuffer(cx, s, sBuf, sLen);
-  if (sCopiedLen != sLen) {
-    delete[] sBuf;
-    JS_ReportError(cx, "Could not encode output");
+  OVR::String str;
+  if (!GetOVRStringVal(cx, args[0], &str)) {
     return false;
   }
-  sBuf[sLen] = '\0';
 
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "PRINT: %s\n", sBuf);
-
-  delete[] sBuf;
-
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "PRINT: %s\n", str.ToCStr());
   return true;
 }
 

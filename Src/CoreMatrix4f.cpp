@@ -9,7 +9,7 @@ static JSClass coreMatrix4fClass = {
   JSCLASS_HAS_PRIVATE    /* flags */
 };
 
-JSObject* NewCoreMatrix4f(JSContext *cx, OVR::Matrix4f* matrix4f) {
+JSObject* NewCoreMatrix4f(JSContext* cx, OVR::Matrix4f* matrix4f) {
   JS::RootedObject self(cx, JS_NewObject(cx, &coreMatrix4fClass));
   if (!JS_DefineFunction(cx, self, "setTranslation", &CoreMatrix4f_setTranslation, 0, 0)) {
     JS_ReportError(cx, "Could not create matrix4f.setTranslation function");
@@ -44,7 +44,7 @@ OVR::Matrix4f* GetMatrix4f(JS::HandleObject obj) {
   return matrix4f;
 }
 
-bool CoreMatrix4f_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreMatrix4f_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   OVR::Matrix4f* matrix4f = new OVR::Matrix4f();
@@ -62,7 +62,7 @@ void CoreMatrix4f_finalize(JSFreeOp *fop, JSObject *obj) {
   delete matrix4f;
 }
 
-bool CoreMatrix4f_setTranslation(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreMatrix4f_setTranslation(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   if (args.length() != 1) {
@@ -87,7 +87,7 @@ bool CoreMatrix4f_setTranslation(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreMatrix4f_multiply(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreMatrix4f_multiply(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   if (args.length() != 1) {
@@ -116,7 +116,7 @@ bool CoreMatrix4f_multiply(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreMatrix4f_rotationX(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreMatrix4f_rotationX(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   if (args.length() != 1) {
@@ -142,7 +142,7 @@ bool CoreMatrix4f_rotationX(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreMatrix4f_rotationY(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreMatrix4f_rotationY(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   if (args.length() != 1) {
@@ -168,7 +168,7 @@ bool CoreMatrix4f_rotationY(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreMatrix4f_rotationZ(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreMatrix4f_rotationZ(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   if (args.length() != 1) {
@@ -194,7 +194,7 @@ bool CoreMatrix4f_rotationZ(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreMatrix4f_transform(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreMatrix4f_transform(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   if (args.length() != 1) {
@@ -222,7 +222,7 @@ bool CoreMatrix4f_transform(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-void SetupCoreMatrix4f(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core) {
+void SetupCoreMatrix4f(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
   coreMatrix4fClass.finalize = CoreMatrix4f_finalize;
   JSObject *obj = JS_InitClass(
       cx,

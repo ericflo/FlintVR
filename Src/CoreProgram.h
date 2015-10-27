@@ -3,7 +3,7 @@
 
 #include "BaseInclude.h"
 
-void SetupCoreProgram(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);
+void SetupCoreProgram(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core);
 OVR::GlProgram* GetProgram(JS::HandleObject obj);
 
 #endif

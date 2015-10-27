@@ -14,7 +14,7 @@ OVR::GlProgram* GetProgram(JS::HandleObject obj) {
 	return program;
 }
 
-bool CoreProgram_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreProgram_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 	JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
 	// Check the arguments length
@@ -29,10 +29,6 @@ bool CoreProgram_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 		return false;
 	}
 
-	// Grab rooted copies of the vertex and fragment shader strings
-	JS::RootedString vertex(cx, JS::ToString(cx, args[0]));
-	JS::RootedString fragment(cx, JS::ToString(cx, args[1]));
-
 	// Go ahead and create our self object and attach the vertex and fragment shaders passed by the user
 	JS::RootedObject self(cx, JS_NewObject(cx, &coreProgramClass));
 	if (!JS_SetProperty(cx, self, "vertex", args[0])) {
@@ -46,36 +42,18 @@ bool CoreProgram_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 		return false;
 	}
 
-	// Copy the vertex and fragment shaders into C string buffers whose memory we control
-	size_t vertexLen = JS_GetStringEncodingLength(cx, vertex) * sizeof(char);
-	char* vertexBuf = new char[vertexLen+1];
-	size_t vertexCopiedLen = JS_EncodeStringToBuffer(cx, vertex, vertexBuf, vertexLen);
-	if (vertexCopiedLen != vertexLen) {
-		delete[] vertexBuf;
-		__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not encode vertex string to program buffer\n");
-		JS_ReportError(cx, "Could not encode vertex string to program buffer");
+	OVR::String vertexStr;
+	if (!GetOVRStringVal(cx, args[0], &vertexStr)) {
 		return false;
 	}
-	vertexBuf[vertexLen] = '\0';
 
-	size_t fragmentLen = JS_GetStringEncodingLength(cx, fragment) * sizeof(char);
-	char* fragmentBuf = new char[fragmentLen+1];
-	size_t fragmentCopiedLen = JS_EncodeStringToBuffer(cx, fragment, fragmentBuf, fragmentLen);
-	if (fragmentCopiedLen != fragmentLen) {
-		delete[] vertexBuf;
-		delete[] fragmentBuf;
-		__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not encode fragment string to program buffer\n");
-		JS_ReportError(cx, "Could not encode fragment string to program buffer");
+	OVR::String fragmentStr;
+	if (!GetOVRStringVal(cx, args[1], &fragmentStr)) {
 		return false;
 	}
-	fragmentBuf[fragmentLen] = '\0';
 
 	// Create the actual program from these C string buffers
-	OVR::GlProgram program = OVR::BuildProgram(vertexBuf, fragmentBuf);
-
-	// Now we can free the buffers
-	delete[] vertexBuf;
-	delete[] fragmentBuf;
+	OVR::GlProgram program = OVR::BuildProgram(vertexStr.ToCStr(), fragmentStr.ToCStr());
 
 	// Make a copy of the GlProgram on the heap so we can put in private storage
 	OVR::GlProgram* heapProgram = new OVR::GlProgram();
@@ -106,7 +84,7 @@ void CoreProgram_finalize(JSFreeOp *fop, JSObject *obj) {
 	delete program;
 }
 
-void SetupCoreProgram(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core) {
+void SetupCoreProgram(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
 	coreProgramClass.finalize = CoreProgram_finalize;
 	JSObject *obj = JS_InitClass(
 			cx,

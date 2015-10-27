@@ -4,7 +4,7 @@
 #include "BaseInclude.h"
 #include "CoreVector3f.h"
 
-OVR::VertexAttribs* ParseVertexAttribs(JSContext *cx, JS::HandleValue val);
+OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val);
 
 #endif
 

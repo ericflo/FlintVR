@@ -3,6 +3,6 @@
 
 #include "BaseInclude.h"
 
-void SetupCoreVertices(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);
+void SetupCoreVertices(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core);
 
 #endif

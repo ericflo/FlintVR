@@ -9,7 +9,7 @@ static JSClass coreVector3fClass = {
 	JSCLASS_HAS_PRIVATE    /* flags */
 };
 
-JSObject* NewCoreVector3f(JSContext *cx, OVR::Vector3f* vector3f) {
+JSObject* NewCoreVector3f(JSContext* cx, OVR::Vector3f* vector3f) {
 	JS::RootedObject self(cx, JS_NewObject(cx, &coreVector3fClass));
 	if (!JS_DefineFunction(cx, self, "add", &CoreVector3f_add, 0, 0)) {
     JS_ReportError(cx, "Could not create vector3f.add function");
@@ -28,7 +28,7 @@ OVR::Vector3f* GetVector3f(JS::HandleObject obj) {
 	return vector3f;
 }
 
-bool CoreVector3f_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreVector3f_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 	JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
 	// Check the arguments length
@@ -67,7 +67,7 @@ bool CoreVector3f_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
 	return true;
 }
 
-bool _setVector3fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* out) {
+bool _setVector3fVertex(JSContext* cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* out) {
 	bool match;
 	// TODO: Can we do this in a more efficient way than string scanning?! Maybe interned strings.
 	//       But first measure overhead, maybe this is fast enough.
@@ -90,7 +90,7 @@ bool _setVector3fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedStri
 	return true;
 }
 
-bool _getVector3fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* num) {
+bool _getVector3fVertex(JSContext* cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* num) {
 	bool match;
 	// TODO: Can we do this in a more efficient way than string scanning?! Maybe interned strings.
 	//       But first measure overhead, maybe this is fast enough.
@@ -104,7 +104,7 @@ bool _getVector3fVertex(JSContext *cx, JS::MutableHandleValue vp, JS::RootedStri
 	return true;
 }
 
-bool CoreVector3f_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp, JS::ObjectOpResult& result) {
+bool CoreVector3f_setProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp, JS::ObjectOpResult& result) {
 	if (JSID_IS_STRING(id)) {
 		JS::RootedString propertyName(cx, JSID_TO_STRING(id));
 		OVR::Vector3f* vector3f = GetVector3f(obj);
@@ -121,7 +121,7 @@ bool CoreVector3f_setProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId 
 	return true;
 }
 
-bool CoreVector3f_getProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp) {
+bool CoreVector3f_getProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp) {
 	if (JSID_IS_STRING(id)) {
 		JS::RootedString propertyName(cx, JSID_TO_STRING(id));
 		OVR::Vector3f* vector3f = GetVector3f(obj);
@@ -145,7 +145,7 @@ void CoreVector3f_finalize(JSFreeOp *fop, JSObject *obj) {
 	delete vector3f;
 }
 
-bool CoreVector3f_add(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreVector3f_add(JSContext* cx, unsigned argc, JS::Value *vp) {
 	JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   if (args.length() != 1) {
@@ -174,7 +174,7 @@ bool CoreVector3f_add(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreVector3f_multiply(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreVector3f_multiply(JSContext* cx, unsigned argc, JS::Value *vp) {
 	JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   if (args.length() != 1) {
@@ -213,7 +213,7 @@ bool CoreVector3f_multiply(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-void SetupCoreVector3f(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core) {
+void SetupCoreVector3f(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
 	coreVector3fClass.finalize = CoreVector3f_finalize;
 	coreVector3fClass.setProperty = CoreVector3f_setProperty;
 	coreVector3fClass.getProperty = CoreVector3f_getProperty;

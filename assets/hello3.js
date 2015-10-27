@@ -58,7 +58,7 @@ function vrmain(env) {
   var cube1 = Model({
     geometry: cubeGeometry,
     program: program,
-    position: Vector3f(0, 0, -5),
+    position: Vector3f(0, 0, -15),
     onFrame: function(ev) {
       if (!this._start) {
         this._start = ev.now;
@@ -66,22 +66,20 @@ function vrmain(env) {
       var secondsElapsed = (ev.now - this._start); // Seconds
       this.position.x = Math.sin(secondsElapsed) * -10;
     },
-    collideTag: "cube1",
-    collidesWith: ["cube2"],
+    collideTag: 'cube1',
+    collidesWith: {'cube2': true, 'cube3': true},
     onCollideStart: function(ev, other) {
       this.position.y -= 1;
-      print("collideStart");
     },
     onCollideEnd: function(ev, other) {
       this.position.y += 1;
-      print("collideEnd");
     }
   });
 
   var cube2 = Model({
     geometry: cubeGeometry,
     program: program,
-    position: Vector3f(0, 0, -5),
+    position: Vector3f(0, 0, -15),
     onFrame: function(ev) {
       if (!this._start) {
         this._start = ev.now;
@@ -89,8 +87,8 @@ function vrmain(env) {
       var secondsElapsed = (ev.now - this._start); // Seconds
       this.position.x = Math.sin(secondsElapsed) * 10;
     },
-    collideTag: "cube2",
-    collidesWith: ["cube1"],
+    collideTag: 'cube2',
+    collidesWith: {'cube1': true},
     onCollideStart: function(ev, other) {
       this.position.y -= 1;
     },
@@ -99,6 +97,28 @@ function vrmain(env) {
     }
   });
 
+  var cube3 = Model({
+    geometry: cubeGeometry,
+    program: program,
+    position: Vector3f(-10, 0, -15),
+    onFrame: function(ev) {
+      if (!this._start) {
+        this._start = ev.now;
+      }
+      var secondsElapsed = (ev.now - this._start); // Seconds
+      this.position.y = Math.cos(secondsElapsed) * 10;
+    },
+    collideTag: 'cube3',
+    collidesWith: {'cube2': true},
+    onCollideStart: function(ev, other) {
+      this.position.x -= 1;
+    },
+    onCollideEnd: function(ev, other) {
+      this.position.x += 1;
+    }
+  });
+
   env.scene.add(cube1);
   env.scene.add(cube2);
+  env.scene.add(cube3);
 }

@@ -14,8 +14,8 @@ public:
   ~CoreGeometry();
 };
 
-void SetupCoreGeometry(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core);
-//JSObject* NewCoreGeometry(JSContext *cx, OVR::GlGeometry *geometry);
+void SetupCoreGeometry(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core);
+//JSObject* NewCoreGeometry(JSContext* cx, OVR::GlGeometry *geometry);
 CoreGeometry* GetCoreGeometry(JS::HandleObject obj);
 
 #endif

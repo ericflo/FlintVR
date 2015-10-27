@@ -21,7 +21,7 @@ static JSClass coreGeometryClass = {
   JSCLASS_HAS_PRIVATE    /* flags */
 };
 
-bool CoreGeometry_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreGeometry_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   // Check the arguments length
@@ -119,7 +119,7 @@ CoreGeometry* GetCoreGeometry(JS::HandleObject obj) {
   return geometry;
 }
 
-void SetupCoreGeometry(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core) {
+void SetupCoreGeometry(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
   coreGeometryClass.finalize = CoreGeometry_finalize;
   JSObject *obj = JS_InitClass(
       cx,

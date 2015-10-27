@@ -38,7 +38,7 @@ static const int GPU_LEVEL			= 1;
 OVR::String PREVIOUS_ERROR;
 OVR::String LATEST_ERROR;
 
-void reportError(JSContext *cx, const char *message, JSErrorReport *report) {
+void reportError(JSContext* cx, const char *message, JSErrorReport *report) {
 	OVR::String err = OVR::String::Format("%s:%u:%s\n",
 			report->filename ? report->filename : "[no filename]",
       (unsigned int) report->lineno,
@@ -145,7 +145,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 	if (!SpidermonkeyJSContext) {
 		return;
 	}
-	JSContext *cx = SpidermonkeyJSContext;
+	JSContext* cx = SpidermonkeyJSContext;
 
 	JS_SetErrorReporter(SpidermonkeyJSRuntime, reportError);
 
@@ -230,7 +230,7 @@ Matrix4f VrCubeWorld::Frame( const VrFrame& vrFrame )
 	}
 
 	// Call the function returned from vrmain
-	JSContext *cx = SpidermonkeyJSContext;
+	JSContext* cx = SpidermonkeyJSContext;
 
 	JS::RootedObject global(cx, SpidermonkeyGlobal.ref());
 	{
@@ -281,7 +281,7 @@ Matrix4f VrCubeWorld::DrawEyeView( const int eye, const float fovDegreesX, const
 	const Matrix4f eyeViewProjection = eyeProjectionMatrix * eyeViewMatrix;
 
 	// Call our scene's DrawEyeView
-	JSContext *cx = SpidermonkeyJSContext;
+	JSContext* cx = SpidermonkeyJSContext;
 	JS::RootedObject global(cx, SpidermonkeyGlobal.ref());
 	{
 		JSAutoCompartment ac(cx, global);

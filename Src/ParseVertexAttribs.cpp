@@ -5,7 +5,7 @@ const static int VERTEX_COLOR = 1;
 
 #define MAX_COMPONENT_COUNT 10
 
-OVR::VertexAttribs* ParseVertexAttribs(JSContext *cx, JS::HandleValue val) {
+OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
   // First make sure it's an object
   if (!val.isObject()) {
     JS_ReportError(cx, "Expected vertices to be an object");

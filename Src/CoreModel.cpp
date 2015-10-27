@@ -25,6 +25,7 @@ CoreModel::~CoreModel(void) {
   positionVal.reset();
   rotationVal.reset();
   scaleVal.reset();
+  collideTagVal.reset();
   onFrameVal.reset();
   onGazeHoverOverVal.reset();
   onGazeHoverOutVal.reset();
@@ -262,7 +263,7 @@ btTransform CoreModel::GetTransform() {
   return transform;
 }
 
-void CoreModel::StartCollisions(JSContext *cx) {
+void CoreModel::StartCollisions(JSContext* cx) {
   if (collisionShape != NULL) {
     delete collisionShape;
     collisionShape = NULL;
@@ -330,7 +331,7 @@ void CoreModel::StopCollisions() {
   */
 }
 
-void CoreModel::UpdateCollisionObjects(JSContext *cx) {
+void CoreModel::UpdateCollisionObjects(JSContext* cx) {
   collisionObj->setWorldTransform(GetTransform());
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
@@ -339,7 +340,33 @@ void CoreModel::UpdateCollisionObjects(JSContext *cx) {
   }
 }
 
-void CoreModel::CollidedWith(JSContext *cx, CoreModel* otherModel, JS::HandleValue ev) {
+bool CoreModel::CheckCollision(JSContext* cx, CoreModel* otherModel) {
+  if (!collideTagVal.isSome() || !otherModel->collidesWithVal.isSome()) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "F1\n");
+    return false;
+  }
+
+  OVR::String tag;
+  if (!GetOVRStringVal(cx, collideTagVal.ref(), &tag)) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "F2\n");
+    return false;
+  }
+
+  JS::RootedObject collidesWith(cx, &otherModel->collidesWithVal.ref().toObject());
+  JS::RootedValue rval(cx);
+  if (!JS_GetProperty(cx, collidesWith, tag.ToCStr(), &rval)) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "F3\n");
+    return false;
+  }
+
+  return rval.isTrue();
+}
+
+void CoreModel::CollidedWith(JSContext* cx, CoreModel* otherModel, JS::HandleValue ev) {
+  if (!CheckCollision(cx, otherModel) || !otherModel->CheckCollision(cx, this)) {
+    return;
+  }
+
   // Mark this id as seen
   seenCollidingIds.PushBack(otherModel->id);
 
@@ -365,7 +392,7 @@ void CoreModel::CollidedWith(JSContext *cx, CoreModel* otherModel, JS::HandleVal
   collidingWithIds.PushBack(otherModel->id);
 }
 
-void CoreModel::FinishCollisions(JSContext *cx, JS::HandleValue ev) {
+void CoreModel::FinishCollisions(JSContext* cx, JS::HandleValue ev) {
   // TODO: Diff the seen and unseen collision ids and trigger collideEnd
   //       callbacks, then clear seenCollidingIds.
   for (int i = 0; i < collidingWithIds.GetSizeI(); ++i) {
@@ -395,7 +422,7 @@ void CoreModel::FinishCollisions(JSContext *cx, JS::HandleValue ev) {
   seenCollidingIds.Clear();
 }
 
-CoreModel* CoreModel::ModelById(JSContext *cx, int otherId) {
+CoreModel* CoreModel::ModelById(JSContext* cx, int otherId) {
   if (id == otherId) {
     // FIXME: This is pretty gross, we're going the long way to get our own pointer
     JS::RootedObject selfObj(cx, &selfVal.ref().toObject());
@@ -414,7 +441,7 @@ CoreModel* CoreModel::ModelById(JSContext *cx, int otherId) {
 }
 
 static JSClass coreModelClass = {
-  "Model",                /* name */
+  "Model",               /* name */
   JSCLASS_HAS_PRIVATE    /* flags */
 };
 
@@ -424,6 +451,8 @@ VRJS_GETSET(CoreModel, matrix)
 VRJS_GETSET(CoreModel, position)
 VRJS_GETSET(CoreModel, rotation)
 VRJS_GETSET(CoreModel, scale)
+VRJS_GETSET(CoreModel, collideTag)
+VRJS_GETSET(CoreModel, collidesWith)
 VRJS_GETSET(CoreModel, onFrame)
 VRJS_GETSET(CoreModel, onGazeHoverOver)
 VRJS_GETSET(CoreModel, onGazeHoverOut)
@@ -440,6 +469,8 @@ static JSPropertySpec CoreModel_props[] = {
   VRJS_PROP(CoreModel, position),
   VRJS_PROP(CoreModel, rotation),
   VRJS_PROP(CoreModel, scale),
+  VRJS_PROP(CoreModel, collideTag),
+  VRJS_PROP(CoreModel, collidesWith),
   VRJS_PROP(CoreModel, onFrame),
   VRJS_PROP(CoreModel, onGazeHoverOver),
   VRJS_PROP(CoreModel, onGazeHoverOut),
@@ -458,7 +489,7 @@ OVR::Vector3f* VRJS_MEMBER(CoreModel, position, GetVector3f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, rotation, GetVector3f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, scale, GetVector3f);
 
-bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   // Check the arguments length
@@ -556,6 +587,21 @@ bool CoreModel_constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
   }
   SetMaybeValue(cx, &scale, model->scaleVal);
 
+  // CollideTag (defaults to "default")
+  JS::RootedValue collideTag(cx);
+  if (!JS_GetProperty(cx, opts, "collideTag", &collideTag) || collideTag.isNullOrUndefined()) {
+    collideTag.setString(JS_NewStringCopyZ(cx, "default"));
+  }
+  SetMaybeValue(cx, &collideTag, model->collideTagVal);
+
+  // CollidesWith
+  JS::RootedValue collidesWith(cx);
+  if (!JS_GetProperty(cx, opts, "collidesWith", &collidesWith) || collidesWith.isNullOrUndefined()) {
+    JSObject* obj = JS_NewPlainObject(cx);
+    collidesWith.setObject(*obj);
+  }
+  SetMaybeValue(cx, &collidesWith, model->collidesWithVal);
+
   // Callbacks
   SetMaybeCallback(cx, &opts, "onFrame", &self, model->onFrameVal);
   SetMaybeCallback(cx, &opts, "onGazeHoverOver", &self, model->onGazeHoverOverVal);
@@ -577,7 +623,7 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   delete model;
 }
 
-bool CoreModel_add(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreModel_add(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   // Check the arguments length
@@ -609,7 +655,7 @@ bool CoreModel_add(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-bool CoreModel_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
+bool CoreModel_remove(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
   // Check the arguments length
@@ -642,7 +688,7 @@ bool CoreModel_remove(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *core) {
+void SetupCoreModel(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
   coreModelClass.finalize = CoreModel_finalize;
   JSObject *obj = JS_InitClass(
       cx,
@@ -661,7 +707,7 @@ void SetupCoreModel(JSContext *cx, JS::RootedObject *global, JS::RootedObject *c
   }
 }
 
-JSObject* NewCoreModel(JSContext *cx, CoreModel* model) {
+JSObject* NewCoreModel(JSContext* cx, CoreModel* model) {
   JS::RootedObject self(cx, JS_NewObject(cx, &coreModelClass));
   if (!JS_DefineProperties(cx, self, CoreModel_props)) {
     __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on model\n");
