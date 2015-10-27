@@ -109,7 +109,7 @@ function vrmain(env) {
       this.position.y = Math.cos(secondsElapsed) * 10;
     },
     collideTag: 'cube3',
-    collidesWith: {'cube2': true},
+    collidesWith: {'cube2': true, 'cube1': true},
     onCollideStart: function(ev, other) {
       this.position.x -= 1;
     },
