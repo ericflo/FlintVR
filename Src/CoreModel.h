@@ -13,14 +13,14 @@ class CoreScene;
 class CoreModel {
 public:
 	int id;
+
+  // State
   bool isHovered;
   bool isTouching;
-  OVR::Matrix4f localMatrix;
-  OVR::Matrix4f worldMatrix;
-  OVR::Array<JS::Heap<JS::Value>> children;
   OVR::Array<int> collidingWithIds;
   OVR::Array<int> seenCollidingIds;
 
+  // Collision State
   btTriangleMesh* triMesh;
   btCollisionShape* collisionShape;
   btCollisionObject* collisionObj;
@@ -48,7 +48,7 @@ public:
   JS::Heap<JS::Value>* collideTagVal;
   JS::Heap<JS::Value>* collidesWithVal;
 
-  // State/uniforms
+  // Uniforms
   JS::Heap<JS::Value>* uniformsVal;
 
   // Callbacks
@@ -63,6 +63,13 @@ public:
 
   JS::Heap<JS::Value>* onCollideStartVal;
   JS::Heap<JS::Value>* onCollideEndVal;
+
+  // Children
+  OVR::Array<JS::Heap<JS::Value>> children;
+
+  // Computed Matrices
+  OVR::Matrix4f localMatrix;
+  OVR::Matrix4f worldMatrix;
 
   CoreModel();
   ~CoreModel();

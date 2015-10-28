@@ -51,7 +51,7 @@ bool CoreModel::RemoveModel(JSContext* cx, CoreModel* model) {
     }
   }
 
-  // If we found it, hooray
+  // If we found it, remove it
   if (idx != -1) {
     children.RemoveAt(idx);
     return true;
@@ -472,8 +472,6 @@ void CoreModel::CollidedWith(JSContext* cx, CoreModel* otherModel, JS::HandleVal
 }
 
 void CoreModel::FinishCollisions(JSContext* cx, JS::HandleValue ev) {
-  // TODO: Diff the seen and unseen collision ids and trigger collideEnd
-  //       callbacks, then clear seenCollidingIds.
   for (int i = 0; i < collidingWithIds.GetSizeI(); ++i) {
     bool found = false;
     for (int j = 0; j < seenCollidingIds.GetSizeI(); ++j) {
