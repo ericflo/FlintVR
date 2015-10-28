@@ -8,7 +8,7 @@
 
 class CoreScene {
 public:
-  OVR::Array<JS::PersistentRootedValue> children;
+  OVR::Array<JS::Heap<JS::Value>> children;
 
   // Would it make sense to wrap these all in an object?
   btDefaultCollisionConfiguration* collisionConfiguration;
@@ -18,7 +18,7 @@ public:
   btDiscreteDynamicsWorld* dynamicsWorld;
 
   OVR::Vector4f* clearColor(JSContext* cx);
-  mozilla::Maybe<JS::PersistentRootedValue> clearColorVal;
+  JS::Heap<JS::Value>* clearColorVal;
 
   CoreScene();
   ~CoreScene();

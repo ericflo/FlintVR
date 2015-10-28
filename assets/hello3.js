@@ -31,6 +31,29 @@ function vrmain(env) {
     ' outColor = fragmentColor;\n'+
     '}'
   ));
+  var redProgram = Program((
+    '#version 300 es\n'+
+    'in vec3 Position;\n'+
+    'in vec4 VertexColor;\n'+
+    'uniform mat4 Modelm;\n'+
+    'uniform mat4 Viewm;\n'+
+    'uniform mat4 Projectionm;\n'+
+    'out vec4 fragmentColor;\n'+
+    'void main()\n'+
+    '{\n'+
+    ' gl_Position = Projectionm * ( Viewm * ( Modelm * vec4( Position, 1.0 ) ) );\n'+
+    ' fragmentColor = VertexColor;\n'+
+    '}'
+  ), (
+    '#version 300 es\n'+
+    'in lowp vec4 fragmentColor;\n'+
+    'out lowp vec4 outColor;\n'+
+    'void main()\n'+
+    '{\n'+
+    ' outColor = vec4(1.0, 0.0, 0.0, 1.0);\n'+
+    '}'
+  ));
+
   var cubeVertices = [
     VERTEX_POSITION,       VERTEX_COLOR,
     Vector3f(-1,  1, -1),  Vector4f(1, 0, 1, 1), // top
@@ -69,10 +92,10 @@ function vrmain(env) {
     collideTag: 'cube1',
     collidesWith: {'cube2': true, 'cube3': true},
     onCollideStart: function(ev, other) {
-      this.position.y -= 1;
+      this.program = redProgram;
     },
     onCollideEnd: function(ev, other) {
-      this.position.y += 1;
+      this.program = program;
     }
   });
 
@@ -90,10 +113,10 @@ function vrmain(env) {
     collideTag: 'cube2',
     collidesWith: {'cube1': true},
     onCollideStart: function(ev, other) {
-      this.position.y -= 1;
+      this.program = redProgram;
     },
     onCollideEnd: function(ev, other) {
-      this.position.y += 1;
+      this.program = program;
     }
   });
 
@@ -111,10 +134,10 @@ function vrmain(env) {
     collideTag: 'cube3',
     collidesWith: {'cube2': true, 'cube1': true},
     onCollideStart: function(ev, other) {
-      this.position.x -= 1;
+      this.program = redProgram;
     },
     onCollideEnd: function(ev, other) {
-      this.position.x += 1;
+      this.program = program;
     }
   });
 

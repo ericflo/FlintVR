@@ -16,7 +16,7 @@ CoreScene::CoreScene(void) {
 }
 
 CoreScene::~CoreScene(void) {
-  clearColorVal.reset();
+  delete clearColorVal;
   delete dynamicsWorld;
   delete solver;
   delete overlappingPairCache;
@@ -118,7 +118,6 @@ void CoreScene::PerformCollisionDetection(JSContext* cx, double now, JS::HandleV
 
 void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms) {
   OVR::Vector4f* clearClr = clearColor(cx);
-  
   glClearColor(clearClr->x, clearClr->y, clearClr->z, clearClr->w);
   glClear(GL_COLOR_BUFFER_BIT);
 
@@ -170,7 +169,7 @@ JSObject* NewCoreScene(JSContext* cx, CoreScene* scene) {
   // Set a white clear color by default
   JS::RootedValue clearColor(cx, JS::ObjectOrNullValue(
     NewCoreVector4f(cx, new OVR::Vector4f(1, 1, 1, 1))));
-  SetMaybeValue(cx, &clearColor, scene->clearColorVal);
+  scene->clearColorVal = new JS::Heap<JS::Value>(clearColor);
   
   if (!JS_DefineFunction(cx, self, "add", &CoreScene_add, 0, 0)) {
     JS_ReportError(cx, "Could not create scene.add function");
@@ -209,12 +208,6 @@ bool CoreScene_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-void CoreScene_finalize(JSFreeOp *fop, JSObject *obj) {
-  CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
-  JS_SetPrivate(obj, NULL);
-  delete scene;
-}
-
 bool CoreScene_add(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
@@ -240,8 +233,7 @@ bool CoreScene_add(JSContext* cx, unsigned argc, JS::Value *vp) {
   // Make sure collision detection is set up and configured
   model->StartCollisions(cx);
 
-  JS::PersistentRootedValue modelVal(cx, args[0]);
-  scene->children.PushBack(modelVal);
+  scene->children.PushBack(JS::Heap<JS::Value>(args[0]));
 
   return true;
 }
@@ -295,7 +287,7 @@ bool CoreScene_setClearColor(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::RootedObject self(cx, &args.thisv().toObject());
   CoreScene* scene = GetCoreScene(self);
 
-  SetMaybeValue(cx, args[0], scene->clearColorVal);
+  scene->clearColorVal = new JS::Heap<JS::Value>(args[0]);
 
   return true;
 }
@@ -318,8 +310,26 @@ bool Core_print(JSContext* cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
+void CoreScene_finalize(JSFreeOp *fop, JSObject *obj) {
+  CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
+  JS_SetPrivate(obj, NULL);
+  delete scene;
+}
+
+void CoreScene_trace(JSTracer *tracer, JSObject *obj) {
+  CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing scene\n");
+  JS_CallValueTracer(tracer, scene->clearColorVal, "clearColorVal");
+  for (int i = 0; i < scene->children.GetSizeI(); ++i) {
+    char buffer[50];
+    sprintf(buffer, "child%d", i);
+    JS_CallValueTracer(tracer, &scene->children[i], buffer);
+  }
+}
+
 CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject* global, JS::RootedObject* core, JS::RootedObject* env) {
   coreSceneClass.finalize = CoreScene_finalize;
+  coreSceneClass.trace = CoreScene_trace;
   JSObject *obj = JS_InitClass(
       cx,
       *core,

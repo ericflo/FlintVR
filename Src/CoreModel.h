@@ -17,7 +17,7 @@ public:
   bool isTouching;
   OVR::Matrix4f localMatrix;
   OVR::Matrix4f worldMatrix;
-  OVR::Array<JS::PersistentRootedValue> children;
+  OVR::Array<JS::Heap<JS::Value>> children;
   OVR::Array<int> collidingWithIds;
   OVR::Array<int> seenCollidingIds;
 
@@ -25,32 +25,32 @@ public:
   btCollisionShape* collisionShape;
   btCollisionObject* collisionObj;
 
-  mozilla::Maybe<JS::PersistentRootedValue> selfVal;
+  JS::Heap<JS::Value>* selfVal;
   CoreScene* scene;
 
   CoreGeometry* geometry(JSContext* cx);
-  OVR::GlProgram* program(JSContext* cx);
+  CoreProgram* program(JSContext* cx);
   OVR::Matrix4f* matrix(JSContext* cx);
   OVR::Vector3f* position(JSContext* cx);
   OVR::Vector3f* rotation(JSContext* cx);
   OVR::Vector3f* scale(JSContext* cx);
-  mozilla::Maybe<JS::PersistentRootedValue> geometryVal;
-  mozilla::Maybe<JS::PersistentRootedValue> programVal;
-  mozilla::Maybe<JS::PersistentRootedValue> matrixVal;
-  mozilla::Maybe<JS::PersistentRootedValue> positionVal;
-  mozilla::Maybe<JS::PersistentRootedValue> rotationVal;
-  mozilla::Maybe<JS::PersistentRootedValue> scaleVal;
-  mozilla::Maybe<JS::PersistentRootedValue> collideTagVal;
-  mozilla::Maybe<JS::PersistentRootedValue> collidesWithVal;
+  JS::Heap<JS::Value>* geometryVal;
+  JS::Heap<JS::Value>* programVal;
+  JS::Heap<JS::Value>* matrixVal;
+  JS::Heap<JS::Value>* positionVal;
+  JS::Heap<JS::Value>* rotationVal;
+  JS::Heap<JS::Value>* scaleVal;
+  JS::Heap<JS::Value>* collideTagVal;
+  JS::Heap<JS::Value>* collidesWithVal;
 
-  mozilla::Maybe<JS::PersistentRootedValue> onFrameVal;
-  mozilla::Maybe<JS::PersistentRootedValue> onGazeHoverOverVal;
-  mozilla::Maybe<JS::PersistentRootedValue> onGazeHoverOutVal;
-  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchDownVal;
-  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchUpVal;
-  mozilla::Maybe<JS::PersistentRootedValue> onGestureTouchCancelVal;
-  mozilla::Maybe<JS::PersistentRootedValue> onCollideStartVal;
-  mozilla::Maybe<JS::PersistentRootedValue> onCollideEndVal;
+  JS::Heap<JS::Value>* onFrameVal;
+  JS::Heap<JS::Value>* onGazeHoverOverVal;
+  JS::Heap<JS::Value>* onGazeHoverOutVal;
+  JS::Heap<JS::Value>* onGestureTouchDownVal;
+  JS::Heap<JS::Value>* onGestureTouchUpVal;
+  JS::Heap<JS::Value>* onGestureTouchCancelVal;
+  JS::Heap<JS::Value>* onCollideStartVal;
+  JS::Heap<JS::Value>* onCollideEndVal;
 
   CoreModel();
   ~CoreModel();
@@ -76,6 +76,6 @@ void SetupCoreModel(JSContext* cx, JS::RootedObject *global, JS::RootedObject *c
 JSObject* NewCoreModel(JSContext* cx, CoreModel* model);
 CoreModel* GetCoreModel(JS::HandleObject obj);
 
-bool CallbackDefined(mozilla::Maybe<JS::PersistentRootedValue>& val);
+bool CallbackDefined(JS::Heap<JS::Value>* val);
 
 #endif

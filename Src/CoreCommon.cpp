@@ -1,19 +1,11 @@
 #include "CoreCommon.h"
 
-void SetMaybeValue(JSContext* cx, JS::MutableHandleValue vp, mozilla::Maybe<JS::PersistentRootedValue>& out) {
-  out.reset();
-  out.emplace(cx, vp);
-}
-
-void SetMaybeCallback(JSContext* cx, JS::RootedObject* opts, const char* name, JS::RootedObject* self, mozilla::Maybe<JS::PersistentRootedValue>& out) {
+void SetMaybeCallback(JSContext* cx, JS::RootedObject* opts, const char* name, JS::Heap<JS::Value>** out) {
   JS::RootedValue callbackVal(cx);
   if (!JS_GetProperty(cx, *opts, name, &callbackVal) || callbackVal.isNullOrUndefined()) {
     callbackVal = JS::RootedValue(cx, JS::NullValue());
   }
-  if (callbackVal.isNullOrUndefined()) {
-    out.reset();
-  }
-  SetMaybeValue(cx, &callbackVal, out);
+  *out = new JS::Heap<JS::Value>(callbackVal);
 }
 
 bool EnsureJSObject(JSContext* cx, JS::MutableHandleValue vp) {

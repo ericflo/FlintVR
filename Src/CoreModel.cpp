@@ -18,22 +18,22 @@ CoreModel::CoreModel(void) :
 }
 
 CoreModel::~CoreModel(void) {
-  selfVal.reset();
-  geometryVal.reset();
-  programVal.reset();
-  matrixVal.reset();
-  positionVal.reset();
-  rotationVal.reset();
-  scaleVal.reset();
-  collideTagVal.reset();
-  onFrameVal.reset();
-  onGazeHoverOverVal.reset();
-  onGazeHoverOutVal.reset();
-  onGestureTouchDownVal.reset();
-  onGestureTouchUpVal.reset();
-  onGestureTouchCancelVal.reset();
-  onCollideStartVal.reset();
-  onCollideEndVal.reset();
+  delete selfVal;
+  delete geometryVal;
+  delete programVal;
+  delete matrixVal;
+  delete positionVal;
+  delete rotationVal;
+  delete scaleVal;
+  delete collideTagVal;
+  delete onFrameVal;
+  delete onGazeHoverOverVal;
+  delete onGazeHoverOutVal;
+  delete onGestureTouchDownVal;
+  delete onGestureTouchUpVal;
+  delete onGestureTouchCancelVal;
+  delete onCollideStartVal;
+  delete onCollideEndVal;
   StopCollisions();
 }
 
@@ -106,7 +106,7 @@ void CoreModel::ComputeMatrices(JSContext* cx, OVR::Matrix4f& transform) {
 
 void CoreModel::CallFrameCallbacks(JSContext* cx, JS::HandleValue ev) {
   if (HasFrameCallback()) {
-    JS::RootedValue callback(cx, onFrameVal.ref());
+    JS::RootedValue callback(cx, *onFrameVal);
     JS::RootedObject modelSelf(cx, &selfVal->toObject());
     JS::RootedValue rval(cx);
     JS::RootedValue evVal(cx, ev);
@@ -157,9 +157,10 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
         isHovered = true;
         // Call the onGazeHoverOver callback
         if (CallbackDefined(onGazeHoverOverVal)) {
-          callback = JS::RootedValue(cx, onGazeHoverOverVal.ref());
+          callback = JS::RootedValue(cx, *onGazeHoverOverVal);
           // TODO: Construct an object (with t0, u, v ?) to add to env
-          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+          if (!JS_CallFunctionValue(cx, self, callback,
+                                    JS::HandleValueArray(evVal), &rval)) {
             JS_ReportError(cx, "Could not call onGazeHoverOver callback");
           }
         }
@@ -169,8 +170,9 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
         isTouching = true;
         // TODO: Construct an object (with t0, u, v ?) to add to env
         if (CallbackDefined(onGestureTouchDownVal)) {
-          callback = JS::RootedValue(cx, onGestureTouchDownVal.ref());
-          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+          callback = JS::RootedValue(cx, *onGestureTouchDownVal);
+          if (!JS_CallFunctionValue(cx, self, callback,
+                                    JS::HandleValueArray(evVal), &rval)) {
             JS_ReportError(cx, "Could not call onGestureTouchDown callback");
           }
         }
@@ -180,9 +182,10 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
         isTouching = false;
         // TODO: Construct an object (with t0, u, v ?) to add to env
         if (CallbackDefined(onGestureTouchUpVal)) {
-          callback = JS::RootedValue(cx, onGestureTouchUpVal.ref());
-          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
-            //JS_ReportError(cx, "Could not call onGestureTouchUp callback");
+          callback = JS::RootedValue(cx, *onGestureTouchUpVal);
+          if (!JS_CallFunctionValue(cx, self, callback,
+                                    JS::HandleValueArray(evVal), &rval)) {
+            JS_ReportError(cx, "Could not call onGestureTouchUp callback");
           }
         }
       }
@@ -191,8 +194,9 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
       if (isTouching) {
         isTouching = false;
         if (CallbackDefined(onGestureTouchCancelVal)) {
-          callback = JS::RootedValue(cx, onGestureTouchCancelVal.ref());
-          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+          callback = JS::RootedValue(cx, *onGestureTouchCancelVal);
+          if (!JS_CallFunctionValue(cx, self, callback,
+                                    JS::HandleValueArray(evVal), &rval)) {
             JS_ReportError(cx, "Could not call onGestureTouchCancel callback");
           }
         }
@@ -201,8 +205,9 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
       if (isHovered) {
         isHovered = false;
         if (CallbackDefined(onGazeHoverOutVal)) {
-          callback = JS::RootedValue(cx, onGazeHoverOutVal.ref());
-          if (!JS_CallFunctionValue(cx, self, callback, JS::HandleValueArray(evVal), &rval)) {
+          callback = JS::RootedValue(cx, *onGazeHoverOutVal);
+          if (!JS_CallFunctionValue(cx, self, callback,
+                                    JS::HandleValueArray(evVal), &rval)) {
             JS_ReportError(cx, "Could not call onGazeHoverOut callback");
           }
         }
@@ -217,9 +222,14 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
   }
 }
 
-void CoreModel::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms) {
-  OVR::GlProgram* prog = program(cx);
+void CoreModel::DrawEyeView(JSContext* cx, const int eye,
+                            const OVR::Matrix4f& eyeViewMatrix,
+                            const OVR::Matrix4f& eyeProjectionMatrix,
+                            const OVR::Matrix4f& eyeViewProjection,
+                            ovrFrameParms& frameParms) {
+  OVR::GlProgram* prog = program(cx)->program;
   OVR::GlGeometry* geom = geometry(cx)->geometry;
+
   glUseProgram(prog->program);
   glUniformMatrix4fv(prog->uModel, 1, GL_TRUE, worldMatrix.M[0]);
   glUniformMatrix4fv(prog->uView, 1, GL_TRUE, eyeViewMatrix.M[0]);
@@ -341,21 +351,19 @@ void CoreModel::UpdateCollisionObjects(JSContext* cx) {
 }
 
 bool CoreModel::CheckCollision(JSContext* cx, CoreModel* otherModel) {
-  if (!collideTagVal.isSome() || !otherModel->collidesWithVal.isSome()) {
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "F1\n");
+  if (collideTagVal == NULL || otherModel->collidesWithVal == NULL) {
     return false;
   }
 
   OVR::String tag;
-  if (!GetOVRStringVal(cx, collideTagVal.ref(), &tag)) {
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "F2\n");
+  JS::RootedValue rootedCollideTagVal(cx, *collideTagVal);
+  if (!GetOVRStringVal(cx, rootedCollideTagVal, &tag)) {
     return false;
   }
 
-  JS::RootedObject collidesWith(cx, &otherModel->collidesWithVal.ref().toObject());
+  JS::RootedObject collidesWith(cx, &otherModel->collidesWithVal->toObject());
   JS::RootedValue rval(cx);
   if (!JS_GetProperty(cx, collidesWith, tag.ToCStr(), &rval)) {
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "F3\n");
     return false;
   }
 
@@ -379,10 +387,10 @@ void CoreModel::CollidedWith(JSContext* cx, CoreModel* otherModel, JS::HandleVal
 
   // If we made it here, it's a new collision, so trigger a callback
   if (CallbackDefined(onCollideStartVal)) {
-    JS::RootedValue callback(cx, onCollideStartVal.ref());
+    JS::RootedValue callback(cx, *onCollideStartVal);
     JS::RootedValue rval(cx);
     JS::RootedValue evVal(cx, ev);
-    JS::RootedObject selfObj(cx, &selfVal.ref().toObject());
+    JS::RootedObject selfObj(cx, &selfVal->toObject());
     if (!JS_CallFunctionValue(cx, selfObj, callback, JS::HandleValueArray(evVal), &rval)) {
       JS_ReportError(cx, "Could not call onCollideStart callback");
     }
@@ -405,11 +413,11 @@ void CoreModel::FinishCollisions(JSContext* cx, JS::HandleValue ev) {
     }
     if (!found) {
       if (CallbackDefined(onCollideEndVal)) {
-        JS::RootedValue callback(cx, onCollideEndVal.ref());
+        JS::RootedValue callback(cx, *onCollideEndVal);
         //CoreModel* otherModel = scene->ModelById(cx, collidingWithIds[i]);
         JS::RootedValue rval(cx);
         JS::RootedValue evVal(cx, ev);
-        JS::RootedObject selfObj(cx, &selfVal.ref().toObject());
+        JS::RootedObject selfObj(cx, &selfVal->toObject());
         if (!JS_CallFunctionValue(cx, selfObj, callback, JS::HandleValueArray(evVal), &rval)) {
           JS_ReportError(cx, "Could not call onCollideEnd callback");
         }
@@ -425,7 +433,7 @@ void CoreModel::FinishCollisions(JSContext* cx, JS::HandleValue ev) {
 CoreModel* CoreModel::ModelById(JSContext* cx, int otherId) {
   if (id == otherId) {
     // FIXME: This is pretty gross, we're going the long way to get our own pointer
-    JS::RootedObject selfObj(cx, &selfVal.ref().toObject());
+    JS::RootedObject selfObj(cx, &selfVal->toObject());
     CoreModel* model = GetCoreModel(selfObj);
     return model;
   }
@@ -483,7 +491,7 @@ static JSPropertySpec CoreModel_props[] = {
 };
 
 CoreGeometry* VRJS_MEMBER(CoreModel, geometry, GetCoreGeometry);
-OVR::GlProgram* VRJS_MEMBER(CoreModel, program, GetProgram);
+CoreProgram* VRJS_MEMBER(CoreModel, program, GetCoreProgram);
 OVR::Matrix4f* VRJS_MEMBER(CoreModel, matrix, GetMatrix4f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, position, GetVector3f);
 OVR::Vector3f* VRJS_MEMBER(CoreModel, rotation, GetVector3f);
@@ -510,8 +518,8 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::RootedObject self(cx, NewCoreModel(cx, model));
 
   // Make sure we have a reference to self
-  JS::RootedValue selfVal(cx, JS::ObjectOrNullValue(self));
-  SetMaybeValue(cx, &selfVal, model->selfVal);
+  JS::RootedValue sval(cx, JS::ObjectOrNullValue(self));
+  model->selfVal = new JS::Heap<JS::Value>(sval);
 
   // Geometry
   JS::RootedValue geometry(cx);
@@ -524,7 +532,7 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  SetMaybeValue(cx, &geometry, model->geometryVal);
+  model->geometryVal = new JS::Heap<JS::Value>(geometry);
 
   // Program
   JS::RootedValue program(cx);
@@ -537,7 +545,7 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  SetMaybeValue(cx, &program, model->programVal);
+  model->programVal = new JS::Heap<JS::Value>(program);
 
   // Base transform matrix
   JS::RootedValue matrix(cx);
@@ -549,7 +557,7 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  SetMaybeValue(cx, &matrix, model->matrixVal);
+  model->matrixVal = new JS::Heap<JS::Value>(matrix);
 
   // Position
   JS::RootedValue position(cx);
@@ -561,7 +569,7 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  SetMaybeValue(cx, &position, model->positionVal);
+  model->positionVal = new JS::Heap<JS::Value>(position);
 
   // Rotation
   JS::RootedValue rotation(cx);
@@ -573,7 +581,7 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  SetMaybeValue(cx, &rotation, model->rotationVal);
+  model->rotationVal = new JS::Heap<JS::Value>(rotation);
 
   // Scale
   JS::RootedValue scale(cx);
@@ -585,14 +593,14 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     delete model;
     return false;
   }
-  SetMaybeValue(cx, &scale, model->scaleVal);
+  model->scaleVal = new JS::Heap<JS::Value>(scale);
 
   // CollideTag (defaults to "default")
   JS::RootedValue collideTag(cx);
   if (!JS_GetProperty(cx, opts, "collideTag", &collideTag) || collideTag.isNullOrUndefined()) {
     collideTag.setString(JS_NewStringCopyZ(cx, "default"));
   }
-  SetMaybeValue(cx, &collideTag, model->collideTagVal);
+  model->collideTagVal = new JS::Heap<JS::Value>(collideTag);
 
   // CollidesWith
   JS::RootedValue collidesWith(cx);
@@ -600,17 +608,17 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     JSObject* obj = JS_NewPlainObject(cx);
     collidesWith.setObject(*obj);
   }
-  SetMaybeValue(cx, &collidesWith, model->collidesWithVal);
+  model->collidesWithVal = new JS::Heap<JS::Value>(collidesWith);
 
   // Callbacks
-  SetMaybeCallback(cx, &opts, "onFrame", &self, model->onFrameVal);
-  SetMaybeCallback(cx, &opts, "onGazeHoverOver", &self, model->onGazeHoverOverVal);
-  SetMaybeCallback(cx, &opts, "onGazeHoverOut", &self, model->onGazeHoverOutVal);
-  SetMaybeCallback(cx, &opts, "onGestureTouchDown", &self, model->onGestureTouchDownVal);
-  SetMaybeCallback(cx, &opts, "onGestureTouchUp", &self, model->onGestureTouchUpVal);
-  SetMaybeCallback(cx, &opts, "onGestureTouchCancel", &self, model->onGestureTouchCancelVal);
-  SetMaybeCallback(cx, &opts, "onCollideStart", &self, model->onCollideStartVal);
-  SetMaybeCallback(cx, &opts, "onCollideEnd", &self, model->onCollideEndVal);
+  SetMaybeCallback(cx, &opts, "onFrame", &model->onFrameVal);
+  SetMaybeCallback(cx, &opts, "onGazeHoverOver", &model->onGazeHoverOverVal);
+  SetMaybeCallback(cx, &opts, "onGazeHoverOut", &model->onGazeHoverOutVal);
+  SetMaybeCallback(cx, &opts, "onGestureTouchDown", &model->onGestureTouchDownVal);
+  SetMaybeCallback(cx, &opts, "onGestureTouchUp", &model->onGestureTouchUpVal);
+  SetMaybeCallback(cx, &opts, "onGestureTouchCancel", &model->onGestureTouchCancelVal);
+  SetMaybeCallback(cx, &opts, "onCollideStart", &model->onCollideStartVal);
+  SetMaybeCallback(cx, &opts, "onCollideEnd", &model->onCollideEndVal);
 
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));
@@ -621,6 +629,32 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
   JS_SetPrivate(obj, NULL);
   delete model;
+}
+
+void CoreModel_trace(JSTracer *tracer, JSObject *obj) {
+  CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing model id: %d\n", model->id);
+  JS_CallValueTracer(tracer, model->geometryVal, "geometryVal");
+  JS_CallValueTracer(tracer, model->programVal, "programVal");
+  JS_CallValueTracer(tracer, model->matrixVal, "matrixVal");
+  JS_CallValueTracer(tracer, model->positionVal, "positionVal");
+  JS_CallValueTracer(tracer, model->rotationVal, "rotationVal");
+  JS_CallValueTracer(tracer, model->scaleVal, "scaleVal");
+  JS_CallValueTracer(tracer, model->collideTagVal, "collideTagVal");
+  JS_CallValueTracer(tracer, model->collidesWithVal, "collidesWithVal");
+  JS_CallValueTracer(tracer, model->onFrameVal, "onFrameVal");
+  JS_CallValueTracer(tracer, model->onGazeHoverOverVal, "onGazeHoverOverVal");
+  JS_CallValueTracer(tracer, model->onGazeHoverOutVal, "onGazeHoverOutVal");
+  JS_CallValueTracer(tracer, model->onGestureTouchDownVal, "onGestureTouchDownVal");
+  JS_CallValueTracer(tracer, model->onGestureTouchUpVal, "onGestureTouchUpVal");
+  JS_CallValueTracer(tracer, model->onGestureTouchCancelVal, "onGestureTouchCancelVal");
+  JS_CallValueTracer(tracer, model->onCollideStartVal, "onCollideStartVal");
+  JS_CallValueTracer(tracer, model->onCollideEndVal, "onCollideEndVal");
+  for (int i = 0; i < model->children.GetSizeI(); ++i) {
+    char buffer[50];
+    sprintf(buffer, "child%d", i);
+    JS_CallValueTracer(tracer, &model->children[i], buffer);
+  }
 }
 
 bool CoreModel_add(JSContext* cx, unsigned argc, JS::Value *vp) {
@@ -649,8 +683,7 @@ bool CoreModel_add(JSContext* cx, unsigned argc, JS::Value *vp) {
   // Make sure collision detection is set up and configured
   otherModel->StartCollisions(cx);
 
-  JS::PersistentRootedValue modelVal(cx, args[0]);
-  thisModel->children.PushBack(modelVal);
+  thisModel->children.PushBack(JS::Heap<JS::Value>(args[0]));
 
   return true;
 }
@@ -690,6 +723,7 @@ bool CoreModel_remove(JSContext* cx, unsigned argc, JS::Value *vp) {
 
 void SetupCoreModel(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
   coreModelClass.finalize = CoreModel_finalize;
+  coreModelClass.trace = CoreModel_trace;
   JSObject *obj = JS_InitClass(
       cx,
       *core,
@@ -729,6 +763,6 @@ CoreModel* GetCoreModel(JS::HandleObject obj) {
   return model;
 }
 
-bool CallbackDefined(mozilla::Maybe<JS::PersistentRootedValue>& val) {
-  return val.isSome() && !val.ref().isNullOrUndefined();
+bool CallbackDefined(JS::Heap<JS::Value>* val) {
+  return val != NULL && !val->isNullOrUndefined();
 }
