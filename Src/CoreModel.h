@@ -25,9 +25,12 @@ public:
   btCollisionShape* collisionShape;
   btCollisionObject* collisionObj;
 
-  JS::Heap<JS::Value>* selfVal;
+  // Parent
   CoreScene* scene;
+  // Self
+  JS::Heap<JS::Value>* selfVal;
 
+  // Engine objects
   CoreGeometry* geometry(JSContext* cx);
   CoreProgram* program(JSContext* cx);
   OVR::Matrix4f* matrix(JSContext* cx);
@@ -40,15 +43,24 @@ public:
   JS::Heap<JS::Value>* positionVal;
   JS::Heap<JS::Value>* rotationVal;
   JS::Heap<JS::Value>* scaleVal;
+
+  // Collision properties
   JS::Heap<JS::Value>* collideTagVal;
   JS::Heap<JS::Value>* collidesWithVal;
 
+  // State/uniforms
+  JS::Heap<JS::Value>* uniformsVal;
+
+  // Callbacks
   JS::Heap<JS::Value>* onFrameVal;
+
   JS::Heap<JS::Value>* onGazeHoverOverVal;
   JS::Heap<JS::Value>* onGazeHoverOutVal;
+
   JS::Heap<JS::Value>* onGestureTouchDownVal;
   JS::Heap<JS::Value>* onGestureTouchUpVal;
   JS::Heap<JS::Value>* onGestureTouchCancelVal;
+
   JS::Heap<JS::Value>* onCollideStartVal;
   JS::Heap<JS::Value>* onCollideEndVal;
 

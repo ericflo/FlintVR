@@ -26,6 +26,8 @@ CoreModel::~CoreModel(void) {
   delete rotationVal;
   delete scaleVal;
   delete collideTagVal;
+  delete collidesWithVal;
+  delete uniformsVal;
   delete onFrameVal;
   delete onGazeHoverOverVal;
   delete onGazeHoverOutVal;
@@ -227,16 +229,85 @@ void CoreModel::DrawEyeView(JSContext* cx, const int eye,
                             const OVR::Matrix4f& eyeProjectionMatrix,
                             const OVR::Matrix4f& eyeViewProjection,
                             ovrFrameParms& frameParms) {
+  // Extract the rendering primitives
   OVR::GlProgram* prog = program(cx)->program;
   OVR::GlGeometry* geom = geometry(cx)->geometry;
 
+  // Switch to our program
   glUseProgram(prog->program);
+
+  // Now we bind our uniforms
   glUniformMatrix4fv(prog->uModel, 1, GL_TRUE, worldMatrix.M[0]);
   glUniformMatrix4fv(prog->uView, 1, GL_TRUE, eyeViewMatrix.M[0]);
   glUniformMatrix4fv(prog->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0]);
+
+  JS::RootedObject uniforms(cx, &uniformsVal->toObject());
+  JS::Rooted<JS::IdVector> names(cx, JS::IdVector(cx));
+  if (!JS_Enumerate(cx, uniforms, &names)) {
+    JS_ReportError(cx, "Couldn't enumerate uniforms");
+    return;
+  }
+  JS::RootedValue nameVal(cx);
+  JS::RootedValue val(cx);
+  OVR::String name;
+  for (uint32_t i = 0; i < names.length(); ++i) {
+    // Root the ID
+    JS::RootedId nameId(cx, names[i]);
+
+    // Get the name string as a value
+    if (!JS_IdToValue(cx, nameId, &nameVal)) {
+      JS_ReportError(cx, "Could not convert the uniform id to a value");
+      return;
+    }
+
+    // Get the string out of the name value
+    if (!GetOVRStringVal(cx, nameVal, &name)) {
+      JS_ReportError(cx, "Could not convert the uniform name to a string");
+      return;
+    }
+
+    // Get the value from the id
+    if (!JS_GetPropertyById(cx, uniforms, nameId, &val)) {
+      JS_ReportError(cx, "Could not get the uniform value");
+      return;
+    }
+
+    // Get the location of the uniform
+    int loc = glGetUniformLocation(prog->program, name.ToCStr());
+
+    // Figure out what type the uniform is and then set it
+    if (val.isBoolean()) {
+      glUniform1i(loc, val.isTrue() ? 1 : 0);
+    } else if (val.isNumber()) {
+      glUniform1f(loc, val.toNumber());
+    } else if (val.isObject()) {
+      JS::RootedObject valObj(cx, &val.toObject());
+      if (JS_InstanceOf(cx, valObj, CoreVector3f_class(), NULL)) {
+        OVR::Vector3f* vec = GetVector3f(valObj);
+        glUniform3fv(loc, 1, &vec->x);
+      } else if (JS_InstanceOf(cx, valObj, CoreVector4f_class(), NULL)) {
+        OVR::Vector4f* vec = GetVector4f(valObj);
+        glUniform4fv(loc, 1, &vec->x);
+      } else if (JS_InstanceOf(cx, valObj, CoreMatrix4f_class(), NULL)) {
+        OVR::Matrix4f* mat = GetMatrix4f(valObj);
+        glUniformMatrix4fv(loc, 1, GL_TRUE, mat->M[0]);
+      } else {
+        JS_ReportError(cx, "Uniform type unknown");
+        return;
+      }
+    } else {
+      JS_ReportError(cx, "Uniform type unknown");
+      return;
+    }
+  }
+
+  // Bind the vertex array
   glBindVertexArray(geom->vertexArrayObject);
+
+  // Finally, draw the elements
   glDrawElements(GL_TRIANGLES, geom->indexCount, GL_UNSIGNED_SHORT, NULL);
 
+  // Recurse
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
     CoreModel* child = GetCoreModel(childObj);
@@ -461,6 +532,7 @@ VRJS_GETSET(CoreModel, rotation)
 VRJS_GETSET(CoreModel, scale)
 VRJS_GETSET(CoreModel, collideTag)
 VRJS_GETSET(CoreModel, collidesWith)
+VRJS_GETSET(CoreModel, uniforms)
 VRJS_GETSET(CoreModel, onFrame)
 VRJS_GETSET(CoreModel, onGazeHoverOver)
 VRJS_GETSET(CoreModel, onGazeHoverOut)
@@ -479,6 +551,7 @@ static JSPropertySpec CoreModel_props[] = {
   VRJS_PROP(CoreModel, scale),
   VRJS_PROP(CoreModel, collideTag),
   VRJS_PROP(CoreModel, collidesWith),
+  VRJS_PROP(CoreModel, uniforms),
   VRJS_PROP(CoreModel, onFrame),
   VRJS_PROP(CoreModel, onGazeHoverOver),
   VRJS_PROP(CoreModel, onGazeHoverOut),
@@ -610,6 +683,14 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   }
   model->collidesWithVal = new JS::Heap<JS::Value>(collidesWith);
 
+  // Uniforms
+  JS::RootedValue uniforms(cx);
+  if (!JS_GetProperty(cx, opts, "uniforms", &uniforms) || uniforms.isNullOrUndefined()) {
+    JSObject* obj = JS_NewPlainObject(cx);
+    uniforms.setObject(*obj);
+  }
+  model->uniformsVal = new JS::Heap<JS::Value>(uniforms);
+
   // Callbacks
   SetMaybeCallback(cx, &opts, "onFrame", &model->onFrameVal);
   SetMaybeCallback(cx, &opts, "onGazeHoverOver", &model->onGazeHoverOverVal);
@@ -642,6 +723,7 @@ void CoreModel_trace(JSTracer *tracer, JSObject *obj) {
   JS_CallValueTracer(tracer, model->scaleVal, "scaleVal");
   JS_CallValueTracer(tracer, model->collideTagVal, "collideTagVal");
   JS_CallValueTracer(tracer, model->collidesWithVal, "collidesWithVal");
+  JS_CallValueTracer(tracer, model->uniformsVal, "uniformsVal");
   JS_CallValueTracer(tracer, model->onFrameVal, "onFrameVal");
   JS_CallValueTracer(tracer, model->onGazeHoverOverVal, "onGazeHoverOverVal");
   JS_CallValueTracer(tracer, model->onGazeHoverOutVal, "onGazeHoverOutVal");

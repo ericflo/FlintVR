@@ -5,8 +5,16 @@
 #endif
 
 static JSClass coreVector3fClass = {
-	"Vector3f",             /* name */
-	JSCLASS_HAS_PRIVATE    /* flags */
+  "Vector3f",             /* name */
+  JSCLASS_HAS_PRIVATE,    /* flags */
+  NULL,
+  NULL,
+  CoreVector3f_getProperty,
+  CoreVector3f_setProperty,
+  NULL,
+  NULL,
+  NULL,
+  CoreVector3f_finalize
 };
 
 JSObject* NewCoreVector3f(JSContext* cx, OVR::Vector3f* vector3f) {
@@ -214,9 +222,6 @@ bool CoreVector3f_multiply(JSContext* cx, unsigned argc, JS::Value *vp) {
 }
 
 void SetupCoreVector3f(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
-	coreVector3fClass.finalize = CoreVector3f_finalize;
-	coreVector3fClass.setProperty = CoreVector3f_setProperty;
-	coreVector3fClass.getProperty = CoreVector3f_getProperty;
 	JSObject *obj = JS_InitClass(
 			cx,
 			*core,
@@ -232,4 +237,8 @@ void SetupCoreVector3f(JSContext* cx, JS::RootedObject *global, JS::RootedObject
 		__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not construct env.core.Vector3f class\n");
 		return;
 	}
+}
+
+const JSClass* CoreVector3f_class() {
+  return &coreVector3fClass;
 }

@@ -21,13 +21,6 @@
     JS::RootedObject self(cx, &args.thisv().toObject()); \
     ClassName* item = Get##ClassName(self); \
     JS::RootedValue newVal(cx, args[0]); \
-    JS::RootedString newValStr(cx, JS::ToString(cx, newVal)); \
-    OVR::String str; \
-    if (!GetOVRString(cx, newValStr, &str)) { \
-      JS_ReportError(cx, "Could not get string from val"); \
-      return false; \
-    } \
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "STRING: %s\n", str.ToCStr()); \
     auto* oldVal = item->name##Val; \
     item->name##Val = new JS::Heap<JS::Value>(newVal); \
     delete oldVal; \

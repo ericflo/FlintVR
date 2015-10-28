@@ -5,8 +5,16 @@
 #endif
 
 static JSClass coreVector4fClass = {
-	"Vector4f",             /* name */
-	JSCLASS_HAS_PRIVATE    /* flags */
+  "Vector4f",             /* name */
+  JSCLASS_HAS_PRIVATE,    /* flags */
+  NULL,
+  NULL,
+  CoreVector4f_getProperty,
+  CoreVector4f_setProperty,
+  NULL,
+  NULL,
+  NULL,
+  CoreVector4f_finalize
 };
 
 JSObject* NewCoreVector4f(JSContext* cx, OVR::Vector4f* vector4f) {
@@ -148,9 +156,6 @@ void CoreVector4f_finalize(JSFreeOp *fop, JSObject *obj) {
 }
 
 void SetupCoreVector4f(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
-	coreVector4fClass.finalize = CoreVector4f_finalize;
-	coreVector4fClass.setProperty = CoreVector4f_setProperty;
-	coreVector4fClass.getProperty = CoreVector4f_getProperty;
 	JSObject *obj = JS_InitClass(
 			cx,
 			*core,
@@ -166,4 +171,8 @@ void SetupCoreVector4f(JSContext* cx, JS::RootedObject *global, JS::RootedObject
 		__android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not construct env.core.Vector4f class\n");
 		return;
 	}
+}
+
+const JSClass* CoreVector4f_class() {
+  return &coreVector4fClass;
 }

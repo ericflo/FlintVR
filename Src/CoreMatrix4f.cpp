@@ -6,7 +6,15 @@
 
 static JSClass coreMatrix4fClass = {
   "Matrix4f",             /* name */
-  JSCLASS_HAS_PRIVATE    /* flags */
+  JSCLASS_HAS_PRIVATE,    /* flags */
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  CoreMatrix4f_finalize
 };
 
 JSObject* NewCoreMatrix4f(JSContext* cx, OVR::Matrix4f* matrix4f) {
@@ -223,7 +231,6 @@ bool CoreMatrix4f_transform(JSContext* cx, unsigned argc, JS::Value *vp) {
 }
 
 void SetupCoreMatrix4f(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
-  coreMatrix4fClass.finalize = CoreMatrix4f_finalize;
   JSObject *obj = JS_InitClass(
       cx,
       *core,
@@ -239,4 +246,8 @@ void SetupCoreMatrix4f(JSContext* cx, JS::RootedObject *global, JS::RootedObject
     __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not construct env.core.Matrix4f class\n");
     return;
   }
+}
+
+const JSClass* CoreMatrix4f_class() {
+  return &coreMatrix4fClass;
 }

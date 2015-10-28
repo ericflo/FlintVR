@@ -15,4 +15,9 @@ bool CoreMatrix4f_rotationY(JSContext* cx, unsigned argc, JS::Value *vp);
 bool CoreMatrix4f_rotationZ(JSContext* cx, unsigned argc, JS::Value *vp);
 bool CoreMatrix4f_transform(JSContext* cx, unsigned argc, JS::Value *vp);
 
+//
+
+void CoreMatrix4f_finalize(JSFreeOp *fop, JSObject *obj);
+const JSClass* CoreMatrix4f_class();
+
 #endif
