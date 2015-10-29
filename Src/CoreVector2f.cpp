@@ -66,7 +66,7 @@ static JSPropertySpec CoreVector2f_props[] = {
 JSObject* NewCoreVector2f(JSContext* cx, OVR::Vector2f* vec) {
   JS::RootedObject self(cx, JS_NewObject(cx, &coreVector2fClass));
   if (!JS_DefineProperties(cx, self, CoreVector2f_props)) {
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on model\n");
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on Vector2f\n");
   }
   JS_SetPrivate(self, (void *)vec);
   return self;
@@ -101,10 +101,8 @@ bool CoreVector2f_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
-  OVR::Vector2f* vec = new OVR::Vector2f(x, y);
-
   // Go ahead and create our self object
-  JS::RootedObject self(cx, NewCoreVector2f(cx, vec));
+  JS::RootedObject self(cx, NewCoreVector2f(cx, new OVR::Vector2f(x, y)));
 
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));

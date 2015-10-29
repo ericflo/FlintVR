@@ -9,31 +9,100 @@ static JSClass coreVector3fClass = {
   JSCLASS_HAS_PRIVATE,    /* flags */
   NULL,
   NULL,
-  CoreVector3f_getProperty,
-  CoreVector3f_setProperty,
+  NULL,
+  NULL,
   NULL,
   NULL,
   NULL,
   CoreVector3f_finalize
 };
 
-JSObject* NewCoreVector3f(JSContext* cx, OVR::Vector3f* vector3f) {
+static bool CoreVector3f_get_x(JSContext* cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  OVR::Vector3f* item = GetVector3f(self);
+  args.rval().setNumber(item->x);
+  return true;
+}
+
+static bool CoreVector3f_set_x(JSContext* cx, unsigned argc, JS::Value* vp) { \
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!args[0].isNumber()) {
+    JS_ReportError(cx, "Invalid number specified");
+    return false;
+  }
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  OVR::Vector3f* item = GetVector3f(self);
+  item->x = args[0].toNumber();
+  return true;
+}
+
+static bool CoreVector3f_get_y(JSContext* cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  OVR::Vector3f* item = GetVector3f(self);
+  args.rval().setNumber(item->y);
+  return true;
+}
+
+static bool CoreVector3f_set_y(JSContext* cx, unsigned argc, JS::Value* vp) { \
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!args[0].isNumber()) {
+    JS_ReportError(cx, "Invalid number specified");
+    return false;
+  }
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  OVR::Vector3f* item = GetVector3f(self);
+  item->y = args[0].toNumber();
+  return true;
+}
+
+static bool CoreVector3f_get_z(JSContext* cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  OVR::Vector3f* item = GetVector3f(self);
+  args.rval().setNumber(item->z);
+  return true;
+}
+
+static bool CoreVector3f_set_z(JSContext* cx, unsigned argc, JS::Value* vp) { \
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!args[0].isNumber()) {
+    JS_ReportError(cx, "Invalid number specified");
+    return false;
+  }
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  OVR::Vector3f* item = GetVector3f(self);
+  item->z = args[0].toNumber();
+  return true;
+}
+
+static JSPropertySpec CoreVector3f_props[] = {
+  VRJS_PROP(CoreVector3f, x),
+  VRJS_PROP(CoreVector3f, y),
+  VRJS_PROP(CoreVector3f, z),
+  JS_PS_END
+};
+
+JSObject* NewCoreVector3f(JSContext* cx, OVR::Vector3f* vec) {
 	JS::RootedObject self(cx, JS_NewObject(cx, &coreVector3fClass));
+  if (!JS_DefineProperties(cx, self, CoreVector3f_props)) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on Vector3f\n");
+  }
 	if (!JS_DefineFunction(cx, self, "add", &CoreVector3f_add, 0, 0)) {
-    JS_ReportError(cx, "Could not create vector3f.add function");
+    JS_ReportError(cx, "Could not create Vector3f.add function");
     return NULL;
   }
   if (!JS_DefineFunction(cx, self, "multiply", &CoreVector3f_multiply, 0, 0)) {
-    JS_ReportError(cx, "Could not create vector3f.multiply function");
+    JS_ReportError(cx, "Could not create Vector3f.multiply function");
     return NULL;
   }
-	JS_SetPrivate(self, (void *)vector3f);
+	JS_SetPrivate(self, (void *)vec);
 	return self;
 }
 
 OVR::Vector3f* GetVector3f(JS::HandleObject obj) {
-	OVR::Vector3f* vector3f = (OVR::Vector3f*)JS_GetPrivate(obj);
-	return vector3f;
+	return (OVR::Vector3f*)JS_GetPrivate(obj);
 }
 
 bool CoreVector3f_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
@@ -65,92 +134,18 @@ bool CoreVector3f_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 		return false;
 	}
 
-	OVR::Vector3f* vector3f = new OVR::Vector3f(x, y, z);
-
 	// Go ahead and create our self object
-	JS::RootedObject self(cx, NewCoreVector3f(cx, vector3f));
+	JS::RootedObject self(cx, NewCoreVector3f(cx, new OVR::Vector3f(x, y, z)));
 
 	// Return our self object
 	args.rval().set(JS::ObjectOrNullValue(self));
 	return true;
 }
 
-bool _setVector3fVertex(JSContext* cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* out) {
-	bool match;
-	// TODO: Can we do this in a more efficient way than string scanning?! Maybe interned strings.
-	//       But first measure overhead, maybe this is fast enough.
-	if (!JS_StringEqualsAscii(cx, *propertyName, propName, &match)) {
-		JS_ReportError(cx, "Could not compare strings");
-		return false;
-	}
-	if (match) {
-		if (!vp.isNumber()) {
-			JS_ReportError(cx, "Vector3f arguments must all be numbers");
-			return false;
-		}
-		double d;
-		if (!JS::ToNumber(cx, vp, &d)) {
-			JS_ReportError(cx, "Could not convert argument to double");
-			return false;
-		}
-		*out = (float)d;
-	}
-	return true;
-}
-
-bool _getVector3fVertex(JSContext* cx, JS::MutableHandleValue vp, JS::RootedString* propertyName, const char* propName, float* num) {
-	bool match;
-	// TODO: Can we do this in a more efficient way than string scanning?! Maybe interned strings.
-	//       But first measure overhead, maybe this is fast enough.
-	if (!JS_StringEqualsAscii(cx, *propertyName, propName, &match)) {
-		JS_ReportError(cx, "Could not compare strings");
-		return false;
-	}
-	if (match) {
-		vp.setNumber((double)*num);
-	}
-	return true;
-}
-
-bool CoreVector3f_setProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp, JS::ObjectOpResult& result) {
-	if (JSID_IS_STRING(id)) {
-		JS::RootedString propertyName(cx, JSID_TO_STRING(id));
-		OVR::Vector3f* vector3f = GetVector3f(obj);
-		if (!_setVector3fVertex(cx, vp, &propertyName, "x", &vector3f->x)) {
-			return false;
-		}
-		if (!_setVector3fVertex(cx, vp, &propertyName, "y", &vector3f->y)) {
-			return false;
-		}
-		if (!_setVector3fVertex(cx, vp, &propertyName, "z", &vector3f->z)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-bool CoreVector3f_getProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp) {
-	if (JSID_IS_STRING(id)) {
-		JS::RootedString propertyName(cx, JSID_TO_STRING(id));
-		OVR::Vector3f* vector3f = GetVector3f(obj);
-		if (!_getVector3fVertex(cx, vp, &propertyName, "x", &vector3f->x)) {
-			return false;
-		}
-		if (!_getVector3fVertex(cx, vp, &propertyName, "y", &vector3f->y)) {
-			return false;
-		}
-		if (!_getVector3fVertex(cx, vp, &propertyName, "z", &vector3f->z)) {
-			return false;
-		}
-	}
-	return true;
-}
-
 void CoreVector3f_finalize(JSFreeOp *fop, JSObject *obj) {
-	OVR::Vector3f* vector3f = (OVR::Vector3f*)JS_GetPrivate(obj);
+	OVR::Vector3f* vec = (OVR::Vector3f*)JS_GetPrivate(obj);
 	JS_SetPrivate(obj, NULL);
-	// TODO: Figure out what to do about ownership of this value and whether to free it
-	delete vector3f;
+	delete vec;
 }
 
 bool CoreVector3f_add(JSContext* cx, unsigned argc, JS::Value *vp) {

@@ -282,7 +282,10 @@ void CoreModel::DrawEyeView(JSContext* cx, const int eye,
       glUniform1f(loc, val.toNumber());
     } else if (val.isObject()) {
       JS::RootedObject valObj(cx, &val.toObject());
-      if (JS_InstanceOf(cx, valObj, CoreVector3f_class(), NULL)) {
+      if (JS_InstanceOf(cx, valObj, CoreVector2f_class(), NULL)) {
+        OVR::Vector2f* vec = GetVector2f(valObj);
+        glUniform2fv(loc, 1, &vec->x);
+      } else if (JS_InstanceOf(cx, valObj, CoreVector3f_class(), NULL)) {
         OVR::Vector3f* vec = GetVector3f(valObj);
         glUniform3fv(loc, 1, &vec->x);
       } else if (JS_InstanceOf(cx, valObj, CoreVector4f_class(), NULL)) {
