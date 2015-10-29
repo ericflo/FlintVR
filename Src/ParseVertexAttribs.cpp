@@ -1,8 +1,5 @@
 #include "ParseVertexAttribs.h"
 
-const static int VERTEX_POSITION = 0;
-const static int VERTEX_COLOR = 1;
-
 #define MAX_COMPONENT_COUNT 10
 
 OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
@@ -86,13 +83,34 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
     int idx = reverse[i % vertexComponents];
     switch (idx) {
     case VERTEX_POSITION:
-      // TODO: Error handling (attn: security)
       attribs->position[vertexNum] = *(GetVector3f(argObj));
       break;
-    case VERTEX_COLOR:
-      // TODO: Error handling (attn: security)
-      attribs->color[vertexNum] = *((OVR::Vector4f*)JS_GetPrivate(argObj));
+    case VERTEX_NORMAL:
+      attribs->normal[vertexNum] = *(GetVector3f(argObj));
       break;
+    case VERTEX_TANGENT:
+      attribs->tangent[vertexNum] = *(GetVector3f(argObj));
+      break;
+    case VERTEX_BINORMAL:
+      attribs->binormal[vertexNum] = *(GetVector3f(argObj));
+      break;
+    case VERTEX_COLOR:
+      attribs->color[vertexNum] = *(GetVector4f(argObj));
+      break;
+    case VERTEX_UV0:
+      attribs->uv0[vertexNum] = *(GetVector2f(argObj));
+      break;
+    case VERTEX_UV1:
+      attribs->uv1[vertexNum] = *(GetVector2f(argObj));
+      break;
+    /*
+    case VERTEX_JOINT_INDICES:
+      attribs->jointIndices[vertexNum] = *(GetVector4i(argObj));
+      break;
+    case VERTEX_JOINT_INDICES:
+      attribs->jointWeights[vertexNum] = *(GetVector4f(argObj));
+      break;
+    */
     }
     if (i % vertexComponents == (size_t)lastVertexIdx) {
       ++vertexNum;

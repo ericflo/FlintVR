@@ -137,13 +137,41 @@ void SetupCoreGeometry(JSContext* cx, JS::RootedObject *global, JS::RootedObject
     return;
   }
 
-  // Now attach our constants for POSITION and COLOR
-  if (!JS_SetProperty(cx, *core, "VERTEX_POSITION", JS::RootedValue(cx, JS::NumberValue(0)))) {
+  // Now attach our constants for VERTEX_*
+  if (!JS_SetProperty(cx, *core, "VERTEX_POSITION", JS::RootedValue(cx, JS::NumberValue(VERTEX_POSITION)))) {
     __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_POSITION constant\n");
     return;
   }
-  if (!JS_SetProperty(cx, *core, "VERTEX_COLOR", JS::RootedValue(cx, JS::NumberValue(1)))) {
+  if (!JS_SetProperty(cx, *core, "VERTEX_NORMAL", JS::RootedValue(cx, JS::NumberValue(VERTEX_NORMAL)))) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_NORMAL constant\n");
+    return;
+  }
+  if (!JS_SetProperty(cx, *core, "VERTEX_TANGENT", JS::RootedValue(cx, JS::NumberValue(VERTEX_TANGENT)))) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_TANGENT constant\n");
+    return;
+  }
+  if (!JS_SetProperty(cx, *core, "VERTEX_BINORMAL", JS::RootedValue(cx, JS::NumberValue(VERTEX_BINORMAL)))) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_BINORMAL constant\n");
+    return;
+  }
+  if (!JS_SetProperty(cx, *core, "VERTEX_COLOR", JS::RootedValue(cx, JS::NumberValue(VERTEX_COLOR)))) {
     __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_COLOR constant\n");
+    return;
+  }
+  if (!JS_SetProperty(cx, *core, "VERTEX_UV0", JS::RootedValue(cx, JS::NumberValue(VERTEX_UV0)))) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_UV0 constant\n");
+    return;
+  }
+  if (!JS_SetProperty(cx, *core, "VERTEX_UV1", JS::RootedValue(cx, JS::NumberValue(VERTEX_UV1)))) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_UV1 constant\n");
+    return;
+  }
+  if (!JS_SetProperty(cx, *core, "VERTEX_JOINT_INDICES", JS::RootedValue(cx, JS::NumberValue(VERTEX_JOINT_INDICES)))) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_JOINT_INDICES constant\n");
+    return;
+  }
+  if (!JS_SetProperty(cx, *core, "VERTEX_JOINT_WEIGHTS", JS::RootedValue(cx, JS::NumberValue(VERTEX_JOINT_WEIGHTS)))) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_JOINT_WEIGHTS constant\n");
     return;
   }
 }

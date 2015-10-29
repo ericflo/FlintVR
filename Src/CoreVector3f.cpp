@@ -45,7 +45,7 @@ bool CoreVector3f_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 		return false;
 	}
 
-	// Check to make sure the args are strings
+	// Check to make sure the args are numbers
 	if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber()) {
 		JS_ReportError(cx, "Vector3f arguments must all be numbers");
 		return false;

@@ -3,6 +3,16 @@
 
 #include "BaseInclude.h"
 
+const static int VERTEX_POSITION = 0;
+const static int VERTEX_NORMAL = 1;
+const static int VERTEX_TANGENT = 2;
+const static int VERTEX_BINORMAL = 3;
+const static int VERTEX_COLOR = 4;
+const static int VERTEX_UV0 = 5;
+const static int VERTEX_UV1 = 6;
+const static int VERTEX_JOINT_INDICES = 7;
+const static int VERTEX_JOINT_WEIGHTS = 8;
+
 #define VRJS_GETSET_POST(ClassName, name, POST) \
   static bool ClassName##_get_##name(JSContext* cx, unsigned argc, JS::Value *vp) { \
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp); \

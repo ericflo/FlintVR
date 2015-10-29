@@ -126,7 +126,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 	//app->SetShowFPS(true);
 
 	// Load the script into memory
-	const char* filename = "hello4.js";
+	const char* filename = "hello5.js";
 	AAsset* asset = AAssetManager_open(AssetManager, filename, AASSET_MODE_BUFFER);
 	if (NULL == asset) {
 		__android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "ASSET NOT FOUND: %s", filename);
@@ -170,6 +170,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 		JS::RootedObject core(cx, JS_NewObject(cx, nullptr));
 		JS::RootedValue coreValue(cx, JS::ObjectOrNullValue(core));
 		SetupCoreProgram(cx, &global, &core);
+		SetupCoreVector2f(cx, &global, &core);
 		SetupCoreVector3f(cx, &global, &core);
 		SetupCoreVector4f(cx, &global, &core);
 		SetupCoreMatrix4f(cx, &global, &core);

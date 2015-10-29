@@ -301,8 +301,11 @@ bool Core_print(JSContext* cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
+  // Coerce whatever was passed in to a string
+  JS::RootedString s(cx, JS::ToString(cx, args[0]));
+
   OVR::String str;
-  if (!GetOVRStringVal(cx, args[0], &str)) {
+  if (!GetOVRString(cx, s, &str)) {
     return false;
   }
 
