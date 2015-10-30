@@ -25,7 +25,7 @@ static bool CoreVector2f_get_x(JSContext* cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-static bool CoreVector2f_set_x(JSContext* cx, unsigned argc, JS::Value* vp) { \
+static bool CoreVector2f_set_x(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   if (!args[0].isNumber()) {
     JS_ReportError(cx, "Invalid number specified");

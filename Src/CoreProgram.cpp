@@ -4,11 +4,6 @@
 #define LOG_COMPONENT "VrCubeWorld"
 #endif
 
-static JSClass coreProgramClass = {
-  "Program",              /* name */
-  JSCLASS_HAS_PRIVATE    /* flags */
-};
-
 CoreProgram::CoreProgram(void) {
   program = NULL;
 }
@@ -23,8 +18,6 @@ CoreProgram::~CoreProgram(void) {
 }
 
 bool CoreProgram::Rebuild(JSContext* cx) {
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Rebuilding program\n");
-
   JS::RootedValue rootedVertexVal(cx, *vertexVal);
   OVR::String vertexStr;
   if (!GetOVRStringVal(cx, rootedVertexVal, &vertexStr)) {
@@ -36,7 +29,11 @@ bool CoreProgram::Rebuild(JSContext* cx) {
     return false;
   }
 
-  OVR::GlProgram prog = OVR::BuildProgram(vertexStr.ToCStr(), fragmentStr.ToCStr());
+  OVR::GlProgram prog = OVR::BuildProgram(vertexStr.ToCStr(), fragmentStr.ToCStr(), false);
+  if (prog.program == 0) {
+    JS_ReportError(cx, "Could not compile shader");
+    return false;
+  }
 
   OVR::GlProgram* heapProgram = new OVR::GlProgram();
   heapProgram->program = prog.program;
@@ -58,6 +55,11 @@ bool CoreProgram::Rebuild(JSContext* cx) {
 
   return true;
 }
+
+static JSClass coreProgramClass = {
+  "Program",              /* name */
+  JSCLASS_HAS_PRIVATE    /* flags */
+};
 
 VRJS_GETSET_POST(CoreProgram, vertex, item->Rebuild(cx))
 VRJS_GETSET_POST(CoreProgram, fragment, item->Rebuild(cx))
@@ -88,7 +90,7 @@ bool CoreProgram_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   prog->vertexVal = new JS::Heap<JS::Value>(args[0]);
   prog->fragmentVal = new JS::Heap<JS::Value>(args[1]);
   if (!prog->Rebuild(cx)) {
-    JS_ReportError(cx, "Could not build shader");
+    JS_ReportError(cx, "Could not build program");
     delete prog;
     return false;
   }

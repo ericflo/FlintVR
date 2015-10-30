@@ -7,6 +7,7 @@
 #include "CoreProgram.h"
 #include "CoreVector3f.h"
 #include "CoreMatrix4f.h"
+#include "CoreTexture.h"
 
 class CoreScene;
 
@@ -43,6 +44,8 @@ public:
   JS::Heap<JS::Value>* positionVal;
   JS::Heap<JS::Value>* rotationVal;
   JS::Heap<JS::Value>* scaleVal;
+
+  JS::Heap<JS::Value>* textureVal;
 
   // Collision properties
   JS::Heap<JS::Value>* collideTagVal;

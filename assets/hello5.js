@@ -2,6 +2,7 @@ function vrmain(env) {
   var Geometry        = env.core.Geometry;
   var Program         = env.core.Program;
   var Model           = env.core.Model;
+  var Texture         = env.core.Texture;
   var Vector2f        = env.core.Vector2f;
   var Vector3f        = env.core.Vector3f;
   var Vector4f        = env.core.Vector4f;
@@ -15,22 +16,27 @@ function vrmain(env) {
     '#version 300 es\n'+
     'in vec3 Position;\n'+
     'in vec4 VertexColor;\n'+
+    'in vec2 TexCoord;\n'+
     'uniform mat4 Modelm;\n'+
     'uniform mat4 Viewm;\n'+
     'uniform mat4 Projectionm;\n'+
     'out vec4 fragmentColor;\n'+
+    'out highp vec2 oTexCoord;\n'+
     'void main()\n'+
     '{\n'+
     ' gl_Position = Projectionm * ( Viewm * ( Modelm * vec4( Position, 1.0 ) ) );\n'+
     ' fragmentColor = VertexColor;\n'+
+    ' oTexCoord = TexCoord;\n'+
     '}'
   ), (
     '#version 300 es\n'+
-    'in lowp vec4 fragmentColor;\n'+
-    'out lowp vec4 outColor;\n'+
+    'uniform sampler2D Texture0;\n'+
+    'in highp vec4 fragmentColor;\n'+
+    'in highp vec2 oTexCoord;\n'+
+    'out highp vec4 outColor;\n'+
     'void main()\n'+
     '{\n'+
-    ' outColor = fragmentColor;\n'+
+    ' outColor = (fragmentColor * 0.5) + (texture(Texture0, oTexCoord) * 0.5);\n'+
     '}'
   ));
   var cubeVertices = [
@@ -56,10 +62,16 @@ function vrmain(env) {
     vertices: cubeVertices,
     indices: cubeIndices
   });
+  var texture = Texture({
+    path: 'assets/noise.jpg',
+    width: 300,
+    height: 300
+  });
 
   var cube = Model({
     geometry: cubeGeometry,
     program: program,
+    texture: texture,
     position: Vector3f(0, 0, -10),
     onFrame: function(ev) {
       if (!this._start) {

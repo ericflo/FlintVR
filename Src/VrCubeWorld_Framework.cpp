@@ -10,6 +10,7 @@
 #include "CoreGeometry.h"
 #include "CoreModel.h"
 #include "CoreScene.h"
+#include "CoreTexture.h"
 
 #if 0
 	#define GL( func )		func; EglCheckErrors();
@@ -175,6 +176,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 		SetupCoreVector4f(cx, &global, &core);
 		SetupCoreMatrix4f(cx, &global, &core);
 		SetupCoreGeometry(cx, &global, &core);
+		SetupCoreTexture(cx, &global, &core);
 		SetupCoreModel(cx, &global, &core);
 		JS::RootedObject env(cx, JS_NewObject(cx, nullptr));
 		coreScene = SetupCoreScene(cx, &global, &core, &env);

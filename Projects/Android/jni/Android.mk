@@ -19,6 +19,7 @@ LOCAL_SRC_FILES       += ../../../Src/ParseVertexAttribs.cpp
 LOCAL_SRC_FILES       += ../../../Src/CoreModel.cpp
 LOCAL_SRC_FILES       += ../../../Src/CoreMatrix4f.cpp
 LOCAL_SRC_FILES       += ../../../Src/CoreCommon.cpp
+LOCAL_SRC_FILES       += ../../../Src/CoreTexture.cpp
 LOCAL_STATIC_LIBRARIES  += vrsound vrlocale vrgui vrappframework libovrkernel spidermonkey_static bullet_static
 LOCAL_SHARED_LIBRARIES  += vrapi libandroid mozglue-prebuilt
 LOCAL_LDLIBS            += -landroid

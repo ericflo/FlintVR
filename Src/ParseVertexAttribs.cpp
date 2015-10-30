@@ -82,11 +82,11 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
         reverse[i] = (int)VERTEX_JOINT_INDICES;
         indices[VERTEX_JOINT_INDICES] = (int)i;
         break;
+      */
       case VERTEX_JOINT_WEIGHTS:
         reverse[i] = (int)VERTEX_JOINT_WEIGHTS;
         indices[VERTEX_JOINT_WEIGHTS] = (int)i;
         break;
-      */
       default:
         JS_ReportError(cx, "Unknown argument in position %d, expected constant flag", i);
         return NULL;
@@ -123,10 +123,10 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
       if (indices[VERTEX_JOINT_INDICES] != -1) {
         attribs->jointIndices.Resize(totalVertices);
       }
+      */
       if (indices[VERTEX_JOINT_WEIGHTS] != -1) {
         attribs->jointWeights.Resize(totalVertices);
       }
-      */
     }
 
     // Looks like we're processing real data now
@@ -151,7 +151,6 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
       attribs->color[vertexNum] = *(GetVector4f(argObj));
       break;
     case VERTEX_UV0:
-      __android_log_print(ANDROID_LOG_ERROR, "VrCubeWorld", "Adding UV\n");
       attribs->uv0[vertexNum] = *(GetVector2f(argObj));
       break;
     case VERTEX_UV1:
@@ -161,10 +160,10 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
     case VERTEX_JOINT_INDICES:
       attribs->jointIndices[vertexNum] = *(GetVector4i(argObj));
       break;
+    */
     case VERTEX_JOINT_WEIGHTS:
       attribs->jointWeights[vertexNum] = *(GetVector4f(argObj));
       break;
-    */
     }
     if (i % vertexComponents == (size_t)lastVertexIdx) {
       ++vertexNum;

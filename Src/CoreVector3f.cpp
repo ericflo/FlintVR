@@ -25,7 +25,7 @@ static bool CoreVector3f_get_x(JSContext* cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-static bool CoreVector3f_set_x(JSContext* cx, unsigned argc, JS::Value* vp) { \
+static bool CoreVector3f_set_x(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   if (!args[0].isNumber()) {
     JS_ReportError(cx, "Invalid number specified");
@@ -45,7 +45,7 @@ static bool CoreVector3f_get_y(JSContext* cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-static bool CoreVector3f_set_y(JSContext* cx, unsigned argc, JS::Value* vp) { \
+static bool CoreVector3f_set_y(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   if (!args[0].isNumber()) {
     JS_ReportError(cx, "Invalid number specified");
@@ -65,7 +65,7 @@ static bool CoreVector3f_get_z(JSContext* cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
-static bool CoreVector3f_set_z(JSContext* cx, unsigned argc, JS::Value* vp) { \
+static bool CoreVector3f_set_z(JSContext* cx, unsigned argc, JS::Value* vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   if (!args[0].isNumber()) {
     JS_ReportError(cx, "Invalid number specified");

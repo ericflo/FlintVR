@@ -15,12 +15,14 @@ CoreModel::CoreModel(void) :
   id = CURRENT_MODEL_ID++;
   collisionShape = NULL;
   collisionObj = NULL;
+  textureVal = NULL;
 }
 
 CoreModel::~CoreModel(void) {
   delete selfVal;
   delete geometryVal;
   delete programVal;
+  delete textureVal;
   delete matrixVal;
   delete positionVal;
   delete rotationVal;
@@ -236,6 +238,16 @@ void CoreModel::DrawEyeView(JSContext* cx, const int eye,
   // Switch to our program
   glUseProgram(prog->program);
 
+  // Use the current texture
+  if (textureVal != NULL && !textureVal->isNullOrUndefined() && textureVal->isObject()) {
+    JS::RootedObject texObj(cx, &textureVal->toObject());
+    CoreTexture* tex = GetCoreTexture(texObj);
+    if (tex != NULL) {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(tex->texture.target, tex->texture.texture);
+    }
+  }
+
   // Now we bind our uniforms
   glUniformMatrix4fv(prog->uModel, 1, GL_TRUE, worldMatrix.M[0]);
   glUniformMatrix4fv(prog->uView, 1, GL_TRUE, eyeViewMatrix.M[0]);
@@ -316,6 +328,12 @@ void CoreModel::DrawEyeView(JSContext* cx, const int eye,
     CoreModel* child = GetCoreModel(childObj);
     child->DrawEyeView(cx, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
   }
+
+  // Unbind
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindVertexArray(0);
+  glUseProgram(0);
 }
 
 bool CoreModel::HasFrameCallback() {
@@ -527,6 +545,7 @@ static JSClass coreModelClass = {
 
 VRJS_GETSET(CoreModel, geometry)
 VRJS_GETSET(CoreModel, program)
+VRJS_GETSET(CoreModel, texture)
 VRJS_GETSET(CoreModel, matrix)
 VRJS_GETSET(CoreModel, position)
 VRJS_GETSET(CoreModel, rotation)
@@ -546,6 +565,7 @@ VRJS_GETSET(CoreModel, onCollideEnd)
 static JSPropertySpec CoreModel_props[] = {
   VRJS_PROP(CoreModel, geometry),
   VRJS_PROP(CoreModel, program),
+  VRJS_PROP(CoreModel, texture),
   VRJS_PROP(CoreModel, matrix),
   VRJS_PROP(CoreModel, position),
   VRJS_PROP(CoreModel, rotation),
@@ -620,6 +640,12 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     return false;
   }
   model->programVal = new JS::Heap<JS::Value>(program);
+
+  // Texture
+  JS::RootedValue texture(cx);
+  if (JS_GetProperty(cx, opts, "texture", &texture) && !texture.isNullOrUndefined()) {
+    model->textureVal = new JS::Heap<JS::Value>(texture);
+  }
 
   // Base transform matrix
   JS::RootedValue matrix(cx);
