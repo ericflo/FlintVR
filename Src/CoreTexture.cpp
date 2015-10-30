@@ -17,6 +17,7 @@ CoreTexture::CoreTexture(
 
 CoreTexture::~CoreTexture(void) {
   OVR::FreeTexture(texture);
+
 }
 
 bool CoreTexture::Rebuild(JSContext* cx) {
@@ -65,7 +66,11 @@ static JSClass coreTextureClass = {
   NULL,
   NULL,
   NULL,
-  CoreTexture_finalize
+  CoreTexture_finalize,
+  NULL,
+  NULL,
+  NULL,
+  CoreTexture_trace
 };
 
 static bool CoreTexture_get_path(JSContext* cx, unsigned argc, JS::Value *vp) {
@@ -212,6 +217,13 @@ void CoreTexture_finalize(JSFreeOp *fop, JSObject *obj) {
   CoreTexture* tex = (CoreTexture*)JS_GetPrivate(obj);
   JS_SetPrivate(obj, NULL);
   delete tex;
+}
+
+void CoreTexture_trace(JSTracer *tracer, JSObject *obj) {
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing texture\n");
+  CoreTexture* tex = (CoreTexture*)JS_GetPrivate(obj);
+  JS_CallValueTracer(tracer, &tex->path, "pathVal");
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing texture\n");
 }
 
 void SetupCoreTexture(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {

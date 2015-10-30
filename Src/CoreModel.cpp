@@ -540,7 +540,19 @@ CoreModel* CoreModel::ModelById(JSContext* cx, int otherId) {
 
 static JSClass coreModelClass = {
   "Model",               /* name */
-  JSCLASS_HAS_PRIVATE    /* flags */
+  JSCLASS_HAS_PRIVATE,   /* flags */
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  CoreModel_finalize,
+  NULL,
+  NULL,
+  NULL,
+  CoreModel_trace
 };
 
 VRJS_GETSET(CoreModel, geometry)
@@ -759,6 +771,7 @@ void CoreModel_trace(JSTracer *tracer, JSObject *obj) {
   JS_CallValueTracer(tracer, model->onGestureTouchCancelVal, "onGestureTouchCancelVal");
   JS_CallValueTracer(tracer, model->onCollideStartVal, "onCollideStartVal");
   JS_CallValueTracer(tracer, model->onCollideEndVal, "onCollideEndVal");
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing model id: %d\n", model->id);
   for (int i = 0; i < model->children.GetSizeI(); ++i) {
     char buffer[50];
     sprintf(buffer, "child%d", i);
@@ -831,8 +844,6 @@ bool CoreModel_remove(JSContext* cx, unsigned argc, JS::Value *vp) {
 }
 
 void SetupCoreModel(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
-  coreModelClass.finalize = CoreModel_finalize;
-  coreModelClass.trace = CoreModel_trace;
   JSObject *obj = JS_InitClass(
       cx,
       *core,

@@ -97,7 +97,8 @@ public:
 void SetupCoreModel(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core);
 JSObject* NewCoreModel(JSContext* cx, CoreModel* model);
 CoreModel* GetCoreModel(JS::HandleObject obj);
-
+void CoreModel_finalize(JSFreeOp *fop, JSObject *obj);
+void CoreModel_trace(JSTracer *tracer, JSObject *obj);
 bool CallbackDefined(JS::Heap<JS::Value>* val);
 
 #endif

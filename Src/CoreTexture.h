@@ -19,6 +19,7 @@ void SetupCoreTexture(JSContext* cx, JS::RootedObject *global, JS::RootedObject 
 JSObject* NewCoreTexture(JSContext* cx, CoreTexture* tex);
 CoreTexture* GetCoreTexture(JS::HandleObject obj);
 void CoreTexture_finalize(JSFreeOp *fop, JSObject *obj);
+void CoreTexture_trace(JSTracer *tracer, JSObject *obj);
 const JSClass* CoreTexture_class();
 
 #endif

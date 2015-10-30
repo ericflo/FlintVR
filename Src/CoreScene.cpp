@@ -155,7 +155,19 @@ static JSPropertySpec CoreScene_props[] = {
 
 static JSClass coreSceneClass = {
   "Scene",                /* name */
-  JSCLASS_HAS_PRIVATE    /* flags */
+  JSCLASS_HAS_PRIVATE,    /* flags */
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  CoreScene_finalize,
+  NULL,
+  NULL,
+  NULL,
+  CoreScene_trace
 };
 
 JSObject* NewCoreScene(JSContext* cx, CoreScene* scene) {
@@ -320,9 +332,11 @@ void CoreScene_finalize(JSFreeOp *fop, JSObject *obj) {
 }
 
 void CoreScene_trace(JSTracer *tracer, JSObject *obj) {
-  CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing scene\n");
+  CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: got scene\n");
   JS_CallValueTracer(tracer, scene->clearColorVal, "clearColorVal");
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Done tracing scene\n");
   for (int i = 0; i < scene->children.GetSizeI(); ++i) {
     char buffer[50];
     sprintf(buffer, "child%d", i);
@@ -331,8 +345,6 @@ void CoreScene_trace(JSTracer *tracer, JSObject *obj) {
 }
 
 CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject* global, JS::RootedObject* core, JS::RootedObject* env) {
-  coreSceneClass.finalize = CoreScene_finalize;
-  coreSceneClass.trace = CoreScene_trace;
   JSObject *obj = JS_InitClass(
       cx,
       *core,

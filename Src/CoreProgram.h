@@ -16,5 +16,7 @@ public:
 void SetupCoreProgram(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core);
 JSObject* NewCoreProgram(JSContext* cx, CoreProgram* prog);
 CoreProgram* GetCoreProgram(JS::HandleObject obj);
+void CoreProgram_finalize(JSFreeOp *fop, JSObject *obj);
+void CoreProgram_trace(JSTracer *tracer, JSObject *obj);
 
 #endif

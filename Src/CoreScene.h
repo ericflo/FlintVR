@@ -36,6 +36,8 @@ private:
 CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core, JS::RootedObject *env);
 JSObject* NewCoreScene(JSContext* cx, CoreScene* scene);
 CoreScene* GetCoreScene(JS::HandleObject obj);
+void CoreScene_finalize(JSFreeOp *fop, JSObject *obj);
+void CoreScene_trace(JSTracer *tracer, JSObject *obj);
 
 bool CoreScene_add(JSContext* cx, unsigned argc, JS::Value *vp);
 bool CoreScene_remove(JSContext* cx, unsigned argc, JS::Value *vp);

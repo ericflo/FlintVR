@@ -58,7 +58,19 @@ bool CoreProgram::Rebuild(JSContext* cx) {
 
 static JSClass coreProgramClass = {
   "Program",              /* name */
-  JSCLASS_HAS_PRIVATE    /* flags */
+  JSCLASS_HAS_PRIVATE,   /* flags */
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  CoreProgram_finalize,
+  NULL,
+  NULL,
+  NULL,
+  CoreProgram_trace
 };
 
 VRJS_GETSET_POST(CoreProgram, vertex, item->Rebuild(cx))
@@ -107,15 +119,16 @@ void CoreProgram_finalize(JSFreeOp *fop, JSObject *obj) {
 }
 
 void CoreProgram_trace(JSTracer *tracer, JSObject *obj) {
-  CoreProgram* program = (CoreProgram*)JS_GetPrivate(obj);
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing program\n");
+  CoreProgram* program = (CoreProgram*)JS_GetPrivate(obj);
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: Got program\n");
   JS_CallValueTracer(tracer, program->vertexVal, "vertexVal");
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: Program vertex\n");
   JS_CallValueTracer(tracer, program->fragmentVal, "fragmentVal");
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing program\n");
 }
 
 void SetupCoreProgram(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
-  coreProgramClass.finalize = CoreProgram_finalize;
-  coreProgramClass.trace = CoreProgram_trace;
   JSObject *obj = JS_InitClass(
       cx,
       *core,
