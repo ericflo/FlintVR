@@ -8,11 +8,8 @@ function vrmain(env) {
   var Matrix4f        = env.core.Matrix4f;
   var VERTEX_POSITION = env.core.VERTEX_POSITION;
   var VERTEX_COLOR    = env.core.VERTEX_COLOR;
+  var VERTEX_UV0      = env.core.VERTEX_UV0;
   ////////////////////////////////////////////
-
-  var v = Vector2f(1, 2);
-  print(v.x);
-  print(v.y);
 
   var program = Program((
     '#version 300 es\n'+
@@ -37,15 +34,15 @@ function vrmain(env) {
     '}'
   ));
   var cubeVertices = [
-    VERTEX_POSITION,       VERTEX_COLOR,
-    Vector3f(-1,  1, -1),  Vector4f(1, 0, 1, 1), // top
-    Vector3f( 1,  1, -1),  Vector4f(0, 1, 0, 1),
-    Vector3f( 1,  1,  1),  Vector4f(0, 0, 1, 1),
-    Vector3f(-1,  1,  1),  Vector4f(1, 0, 0, 1),
-    Vector3f(-1, -1, -1),  Vector4f(0, 0, 1, 1), // bottom
-    Vector3f(-1, -1,  1),  Vector4f(0, 1, 0, 1),
-    Vector3f( 1, -1,  1),  Vector4f(1, 0, 1, 1),
-    Vector3f( 1, -1, -1),  Vector4f(1, 0, 0, 1)
+    VERTEX_POSITION,       VERTEX_COLOR,          VERTEX_UV0,
+    Vector3f(-1,  1, -1),  Vector4f(1, 0, 1, 1),  Vector2f(-1, -1), // top
+    Vector3f( 1,  1, -1),  Vector4f(0, 1, 0, 1),  Vector2f( 1, -1),
+    Vector3f( 1,  1,  1),  Vector4f(0, 0, 1, 1),  Vector2f( 1,  1),
+    Vector3f(-1,  1,  1),  Vector4f(1, 0, 0, 1),  Vector2f(-1,  1),
+    Vector3f(-1, -1, -1),  Vector4f(0, 0, 1, 1),  Vector2f(-1, -1), // bottom
+    Vector3f(-1, -1,  1),  Vector4f(0, 1, 0, 1),  Vector2f(-1,  1),
+    Vector3f( 1, -1,  1),  Vector4f(1, 0, 1, 1),  Vector2f( 1,  1),
+    Vector3f( 1, -1, -1),  Vector4f(1, 0, 0, 1),  Vector2f( 1, -1),
   ];
   var cubeIndices = [
     0, 1, 2, 2, 3, 0, // top

@@ -53,10 +53,40 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
         reverse[i] = (int)VERTEX_POSITION;
         indices[VERTEX_POSITION] = (int)i;
         break;
+      case VERTEX_NORMAL:
+        reverse[i] = (int)VERTEX_NORMAL;
+        indices[VERTEX_NORMAL] = (int)i;
+        break;
+      case VERTEX_TANGENT:
+        reverse[i] = (int)VERTEX_TANGENT;
+        indices[VERTEX_TANGENT] = (int)i;
+        break;
+      case VERTEX_BINORMAL:
+        reverse[i] = (int)VERTEX_BINORMAL;
+        indices[VERTEX_BINORMAL] = (int)i;
+        break;
       case VERTEX_COLOR:
         reverse[i] = (int)VERTEX_COLOR;
         indices[VERTEX_COLOR] = (int)i;
         break;
+      case VERTEX_UV0:
+        reverse[i] = (int)VERTEX_UV0;
+        indices[VERTEX_UV0] = (int)i;
+        break;
+      case VERTEX_UV1:
+        reverse[i] = (int)VERTEX_UV1;
+        indices[VERTEX_UV1] = (int)i;
+        break;
+      /*
+      case VERTEX_JOINT_INDICES:
+        reverse[i] = (int)VERTEX_JOINT_INDICES;
+        indices[VERTEX_JOINT_INDICES] = (int)i;
+        break;
+      case VERTEX_JOINT_WEIGHTS:
+        reverse[i] = (int)VERTEX_JOINT_WEIGHTS;
+        indices[VERTEX_JOINT_WEIGHTS] = (int)i;
+        break;
+      */
       default:
         JS_ReportError(cx, "Unknown argument in position %d, expected constant flag", i);
         return NULL;
@@ -71,9 +101,32 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
       if (indices[VERTEX_POSITION] != -1) {
         attribs->position.Resize(totalVertices);
       }
+      if (indices[VERTEX_NORMAL] != -1) {
+        attribs->normal.Resize(totalVertices);
+      }
+      if (indices[VERTEX_TANGENT] != -1) {
+        attribs->tangent.Resize(totalVertices);
+      }
+      if (indices[VERTEX_BINORMAL] != -1) {
+        attribs->binormal.Resize(totalVertices);
+      }
       if (indices[VERTEX_COLOR] != -1) {
         attribs->color.Resize(totalVertices);
       }
+      if (indices[VERTEX_UV0] != -1) {
+        attribs->uv0.Resize(totalVertices);
+      }
+      if (indices[VERTEX_UV1] != -1) {
+        attribs->uv1.Resize(totalVertices);
+      }
+      /*
+      if (indices[VERTEX_JOINT_INDICES] != -1) {
+        attribs->jointIndices.Resize(totalVertices);
+      }
+      if (indices[VERTEX_JOINT_WEIGHTS] != -1) {
+        attribs->jointWeights.Resize(totalVertices);
+      }
+      */
     }
 
     // Looks like we're processing real data now
@@ -98,6 +151,7 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
       attribs->color[vertexNum] = *(GetVector4f(argObj));
       break;
     case VERTEX_UV0:
+      __android_log_print(ANDROID_LOG_ERROR, "VrCubeWorld", "Adding UV\n");
       attribs->uv0[vertexNum] = *(GetVector2f(argObj));
       break;
     case VERTEX_UV1:
@@ -107,7 +161,7 @@ OVR::VertexAttribs* ParseVertexAttribs(JSContext* cx, JS::HandleValue val) {
     case VERTEX_JOINT_INDICES:
       attribs->jointIndices[vertexNum] = *(GetVector4i(argObj));
       break;
-    case VERTEX_JOINT_INDICES:
+    case VERTEX_JOINT_WEIGHTS:
       attribs->jointWeights[vertexNum] = *(GetVector4f(argObj));
       break;
     */
