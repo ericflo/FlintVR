@@ -12,11 +12,35 @@ CoreScene::CoreScene(void) {
   solver = new btSequentialImpulseConstraintSolver;
   dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache,
     solver, collisionConfiguration);
+  backgroundVal = NULL;
+  globe = OVR::BuildGlobe();
+  backgroundProgram = OVR::BuildProgram(
+    "uniform mat4 Mvpm;\n"
+    "attribute vec4 Position;\n"
+    "uniform mediump vec4 UniformColor;\n"
+    "varying  lowp vec4 oColor;\n"
+    "varying highp vec3 oTexCoord;\n"
+    "void main()\n"
+    "{\n"
+    "   gl_Position = Mvpm * Position;\n"
+    " oTexCoord = Position.xyz;\n"
+    "   oColor = UniformColor;\n"
+    "}\n"
+    ,
+    "uniform samplerCube Texture0;\n"
+    "varying highp vec3 oTexCoord;\n"
+    "varying lowp vec4  oColor;\n"
+    "void main()\n"
+    "{\n"
+    " gl_FragColor = oColor * textureCube( Texture0, oTexCoord );\n"
+    "}\n"
+  );
   //dynamicsWorld->setGravity(btVector3(0,-10,0)); // TODO: Remove me
 }
 
 CoreScene::~CoreScene(void) {
   delete clearColorVal;
+  delete backgroundVal;
   delete dynamicsWorld;
   delete solver;
   delete overlappingPairCache;
@@ -117,9 +141,43 @@ void CoreScene::PerformCollisionDetection(JSContext* cx, double now, JS::HandleV
 }
 
 void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms) {
-  OVR::Vector4f* clearClr = clearColor(cx);
+  JS::RootedObject rootedClearColorVal(cx, &clearColorVal->toObject());
+  OVR::Vector4f* clearClr = GetVector4f(rootedClearColorVal);
   glClearColor(clearClr->x, clearClr->y, clearClr->z, clearClr->w);
   glClear(GL_COLOR_BUFFER_BIT);
+
+  // Render the background texture if it exists
+  if (backgroundVal != NULL && !backgroundVal->isNullOrUndefined() && backgroundVal->isObject()) {
+    JS::RootedObject bkgObj(cx, &backgroundVal->toObject());
+    CoreTexture* bkg = GetCoreTexture(bkgObj);
+    if (bkg != NULL) {
+      if (bkg->texture.target != GL_TEXTURE_CUBE_MAP) {
+        JS_ReportError(cx, "Background texture must be a cube map");
+      } else {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(bkg->texture.target, bkg->texture.texture);
+        if (HasEXT_sRGB_texture_decode) {
+          glTexParameteri(bkg->texture.target, GL_TEXTURE_SRGB_DECODE_EXT, GL_DECODE_EXT);
+        }
+        glUseProgram(backgroundProgram.program);
+        glUniform4f(backgroundProgram.uColor, 1.0f, 1.0f, 1.0f, 1.0f);
+        glUniformMatrix4fv(backgroundProgram.uMvp, 1, GL_TRUE, eyeViewProjection.M[0]);
+        globe.Draw();
+        glBindTexture(bkg->texture.target, 0);
+        frameParms.WarpOptions = 0; // srgb
+        frameParms.WarpProgram = VRAPI_FRAME_PROGRAM_SIMPLE;
+        frameParms.LayerCount = 1;
+        frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].SrcBlend = VRAPI_FRAME_LAYER_BLEND_ONE;
+        frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].DstBlend = VRAPI_FRAME_LAYER_BLEND_ZERO;
+        frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].WriteAlpha = false;
+        frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_OVERLAY].Textures[eye].ColorTextureSwapChain = NULL;
+        for (int i = 0; i < 4; ++i) {
+          frameParms.ProgramParms[i] = 1.0f;
+        }
+      }
+      OVR::GL_CheckErrors("draw");
+    }
+  }
 
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
@@ -145,11 +203,14 @@ CoreModel* CoreScene::ModelById(JSContext* cx, int id) {
 }
 
 OVR::Vector4f* VRJS_MEMBER(CoreScene, clearColor, GetVector4f);
+//CoreTexture* VRJS_MEMBER(CoreScene, background, GetCoreTexture);
 
-VRJS_GETSET(CoreScene, clearColor)
+VRJS_GETSET(CoreScene, clearColor);
+VRJS_GETSET(CoreScene, background);
 
 static JSPropertySpec CoreScene_props[] = {
   VRJS_PROP(CoreScene, clearColor),
+  VRJS_PROP(CoreScene, background),
   JS_PS_END
 };
 
@@ -336,6 +397,8 @@ void CoreScene_trace(JSTracer *tracer, JSObject *obj) {
   CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: got scene\n");
   JS_CallValueTracer(tracer, scene->clearColorVal, "clearColorVal");
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: scene clearColorVal\n");
+  JS_CallValueTracer(tracer, scene->backgroundVal, "backgroundVal");
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Done tracing scene\n");
   for (int i = 0; i < scene->children.GetSizeI(); ++i) {
     char buffer[50];
@@ -361,7 +424,6 @@ CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject* global, JS::RootedObj
     return NULL;
   }
 
-  // TODO: Free this somewhere, it's a singleton now but who knows later
   CoreScene* scene = new CoreScene();
   JS::RootedObject sceneObj(cx, NewCoreScene(cx, scene));
   JS::RootedValue sceneVal(cx, JS::ObjectOrNullValue(sceneObj));

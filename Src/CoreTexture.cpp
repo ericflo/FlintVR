@@ -8,10 +8,12 @@ CoreTexture::CoreTexture(
   JSContext* cx,
   JS::HandleValue _path,
   int _width,
-  int _height) :
+  int _height,
+  bool _cube) :
     path(_path),
     width(_width),
-    height(_height) {
+    height(_height),
+    cube(_cube) {
   Rebuild(cx);
 }
 
@@ -20,17 +22,92 @@ CoreTexture::~CoreTexture(void) {
 
 }
 
-bool CoreTexture::Rebuild(JSContext* cx) {
-  // First, free any texture we already have (no-op if it's a 0-texture)
-  OVR::FreeTexture(texture);
+bool CoreTexture::RebuildCubemap(JSContext* cx, OVR::String pathStr) {
+  // Get the file extension, and a copy of the path with no extension
+  OVR::String ext = pathStr.GetExtension();
+  OVR::String noExt(pathStr);
+  noExt.StripExtension();
 
-  // Get the path string
-  OVR::String pathStr;
-  JS::RootedValue pathVal(cx, path);
-  if (!GetOVRStringVal(cx, pathVal, &pathStr)) {
+  // Create some membuffers for the files we're going to open
+  OVR::MemBufferFile mbfs[6] = { 
+    OVR::MemBufferFile(OVR::MemBufferFile::NoInit), 
+    OVR::MemBufferFile(OVR::MemBufferFile::NoInit),
+    OVR::MemBufferFile(OVR::MemBufferFile::NoInit),
+    OVR::MemBufferFile(OVR::MemBufferFile::NoInit),
+    OVR::MemBufferFile(OVR::MemBufferFile::NoInit),
+    OVR::MemBufferFile(OVR::MemBufferFile::NoInit) 
+  };
+  
+  // Load all of them up
+  const char* const cubeSuffix[6] = {"_px", "_nx", "_py", "_ny", "_pz", "_nz"};
+  for (int side = 0; side < 6; ++side) {
+    OVR::String sidePath = noExt + OVR::String(cubeSuffix[side]) + ext;
+    // Get it from the package for now
+    // TODO: Pull from somewhere else?
+    if (!OVR::ovr_ReadFileFromApplicationPackage(sidePath.ToCStr(), mbfs[side])) {
+      return false;
+    }
+  }
+
+  unsigned char* data[6];
+  int comp, imgWidth, imgHeight;
+  // For each side of the cube
+  for (int i = 0; i < 6; ++i) {
+    // Load the image
+    data[i] = (unsigned char *)stbi_load_from_memory(
+      (unsigned char *)mbfs[i].Buffer, mbfs[i].Length, &imgWidth, &imgHeight, &comp, 4);
+
+    // Sanity check image dimensions
+    if (imgWidth != width) {
+      JS_ReportError(cx, "Cubemap has mismatched image width");
+      return false;
+    }
+    if (imgHeight != height) {
+      JS_ReportError(cx, "Cubemap has mismatched image height");
+      return false;
+    }
+    if (imgWidth <= 0 || imgWidth > 32768 || imgHeight <= 0 || imgHeight > 32768) {
+      JS_ReportError(cx, "Invalid texture size");
+      return false;
+    }
+  }
+
+  GLenum glFormat;
+  GLenum glInternalFormat;
+  if (!TextureFormatToGlFormat(OVR::Texture_RGBA, true, glFormat, glInternalFormat)) {
+    JS_ReportError(cx, "Invalid texture format OVR::Texture_RGBA");
     return false;
   }
 
+  GLuint texId;
+  glGenTextures(1, &texId);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
+
+  // Get the total size (GetOvrTextureSize(OVR::Texture_RGBA, width, height) * 6)
+  // size_t totalSize = (((width + 3) / 4) * ((height + 3) / 4) * 8) * 6;
+
+  for (int i = 0; i < 6; ++i) {
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, glInternalFormat, width, height, 0, glFormat, GL_UNSIGNED_BYTE, data[i]);
+  }
+
+  // Generate mipmaps and bind the texture
+  glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+  // Construct our actual texture object
+  texture = OVR::GlTexture(texId, GL_TEXTURE_CUBE_MAP);
+
+  // Free our image data
+  for (int i = 0; i < 6; ++i) {
+    free(data[i]);
+  }
+
+  // Wait for the upload to complete.
+  glFinish();
+  return true;
+}
+
+bool CoreTexture::RebuildTexture(JSContext* cx, OVR::String pathStr) {
   // Get it from the package for now
   // TODO: Pull from somewhere else?
   OVR::MemBufferFile bufferFile(OVR::MemBufferFile::NoInit);
@@ -48,10 +125,31 @@ bool CoreTexture::Rebuild(JSContext* cx) {
     height
   );
 
-  BuildTextureMipmaps(texture); // Optional?
+  BuildTextureMipmaps(texture); // Optional? Also does this happen in LoadTextureFromBuffer?
 
   // TODO: MakeTextureClamped MakeTextureLodClamped MakeTextureTrilinear
   //       MakeTextureLinear, MakeTextureAniso
+
+  return true;
+}
+
+bool CoreTexture::Rebuild(JSContext* cx) {
+  // First, free any texture we already have (no-op if it's a 0-texture)
+  OVR::FreeTexture(texture);
+
+  // Get the path string
+  OVR::String pathStr;
+  JS::RootedValue pathVal(cx, path);
+  if (!GetOVRStringVal(cx, pathVal, &pathStr)) {
+    return false;
+  }
+
+  // If it's a cube map
+  if (cube) {
+    return RebuildCubemap(cx, pathStr);
+  } else {
+    return RebuildTexture(cx, pathStr);
+  }
 
   return true;
 }
@@ -137,10 +235,32 @@ static bool CoreTexture_set_height(JSContext* cx, unsigned argc, JS::Value* vp) 
   return true;
 }
 
+static bool CoreTexture_get_cube(JSContext* cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  CoreTexture* item = GetCoreTexture(self);
+  args.rval().setBoolean(item->cube);
+  return true;
+}
+
+static bool CoreTexture_set_cube(JSContext* cx, unsigned argc, JS::Value* vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!args[0].isBoolean()) {
+    JS_ReportError(cx, "Invalid cube boolean specified");
+    return false;
+  }
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  CoreTexture* item = GetCoreTexture(self);
+  item->cube = args[0].toBoolean();
+  item->Rebuild(cx);
+  return true;
+}
+
 static JSPropertySpec CoreTexture_props[] = {
   VRJS_PROP(CoreTexture, path),
   VRJS_PROP(CoreTexture, width),
   VRJS_PROP(CoreTexture, height),
+  VRJS_PROP(CoreTexture, cube),
   JS_PS_END
 };
 
@@ -204,8 +324,15 @@ bool CoreTexture_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
+  // Cube
+  JS::RootedValue cubeVal(cx);
+  if (!JS_GetProperty(cx, opts, "cube", &cubeVal) || cubeVal.isNullOrUndefined() || !cubeVal.isBoolean()) {
+    cubeVal = JS::RootedValue(cx, JS::FalseValue());
+  }
+
   // Create our self object
-  CoreTexture* tex = new CoreTexture(cx, pathVal, widthVal.toInt32(), heightVal.toInt32());
+  CoreTexture* tex = new CoreTexture(cx, pathVal, widthVal.toInt32(),
+                                     heightVal.toInt32(), cubeVal.toBoolean());
   JS::RootedObject self(cx, NewCoreTexture(cx, tex));
 
   // Return our self object

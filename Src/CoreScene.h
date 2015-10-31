@@ -4,6 +4,7 @@
 #include "BaseInclude.h"
 #include "CoreModel.h"
 #include "CoreVector4f.h"
+#include "CoreTexture.h"
 #include "Kernel/OVR_Std.h"
 
 class CoreScene {
@@ -17,8 +18,12 @@ public:
   btSequentialImpulseConstraintSolver* solver;
   btDiscreteDynamicsWorld* dynamicsWorld;
 
+  OVR::GlGeometry globe;
+  OVR::GlProgram backgroundProgram;
+
   OVR::Vector4f* clearColor(JSContext* cx);
   JS::Heap<JS::Value>* clearColorVal;
+  JS::Heap<JS::Value>* backgroundVal;
 
   CoreScene();
   ~CoreScene();

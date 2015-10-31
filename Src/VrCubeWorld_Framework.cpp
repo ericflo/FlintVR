@@ -127,7 +127,7 @@ void VrCubeWorld::OneTimeInit( const char * fromPackageName, const char * launch
 	//app->SetShowFPS(true);
 
 	// Load the script into memory
-	const char* filename = "hello5.js";
+	const char* filename = "hello6.js";
 	AAsset* asset = AAssetManager_open(AssetManager, filename, AASSET_MODE_BUFFER);
 	if (NULL == asset) {
 		__android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "ASSET NOT FOUND: %s", filename);
