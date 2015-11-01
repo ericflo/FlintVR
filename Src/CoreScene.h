@@ -19,7 +19,8 @@ public:
   btDiscreteDynamicsWorld* dynamicsWorld;
 
   OVR::GlGeometry globe;
-  OVR::GlProgram backgroundProgram;
+  OVR::GlProgram cubeProgram;
+  OVR::GlProgram panoProgram;
 
   OVR::Vector4f* clearColor(JSContext* cx);
   JS::Heap<JS::Value>* clearColorVal;

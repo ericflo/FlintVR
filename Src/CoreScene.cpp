@@ -14,7 +14,7 @@ CoreScene::CoreScene(void) {
     solver, collisionConfiguration);
   backgroundVal = NULL;
   globe = OVR::BuildGlobe();
-  backgroundProgram = OVR::BuildProgram(
+  cubeProgram = OVR::BuildProgram(
     "uniform mat4 Mvpm;\n"
     "attribute vec4 Position;\n"
     "uniform mediump vec4 UniformColor;\n"
@@ -33,6 +33,29 @@ CoreScene::CoreScene(void) {
     "void main()\n"
     "{\n"
     " gl_FragColor = oColor * textureCube( Texture0, oTexCoord );\n"
+    "}\n"
+  );
+  panoProgram = OVR::BuildProgram(
+    "uniform mat4 Mvpm;\n"
+    "attribute vec4 Position;\n"
+    "attribute vec4 VertexColor;\n"
+    "attribute vec2 TexCoord;\n"
+    "uniform mediump vec4 UniformColor;\n"
+    "varying  lowp vec4 oColor;\n"
+    "varying highp vec2 oTexCoord;\n"
+    "void main()\n"
+    "{\n"
+    "   gl_Position = Mvpm * Position;\n"
+    " oTexCoord = TexCoord;\n"
+    "   oColor = /* VertexColor * */ UniformColor;\n"
+    "}\n"
+    ,
+    "uniform sampler2D Texture0;\n"
+    "varying highp vec2 oTexCoord;\n"
+    "varying lowp vec4  oColor;\n"
+    "void main()\n"
+    "{\n"
+    " gl_FragColor = oColor * texture2D( Texture0, oTexCoord );\n"
     "}\n"
   );
   //dynamicsWorld->setGravity(btVector3(0,-10,0)); // TODO: Remove me
@@ -149,31 +172,45 @@ void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& e
   // Render the background texture if it exists
   if (backgroundVal != NULL && !backgroundVal->isNullOrUndefined() && backgroundVal->isObject()) {
     JS::RootedObject bkgObj(cx, &backgroundVal->toObject());
-    CoreTexture* bkg = GetCoreTexture(bkgObj);
-    if (bkg != NULL) {
-      if (bkg->texture.target != GL_TEXTURE_CUBE_MAP) {
-        JS_ReportError(cx, "Background texture must be a cube map");
-      } else {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(bkg->texture.target, bkg->texture.texture);
-        if (HasEXT_sRGB_texture_decode) {
-          glTexParameteri(bkg->texture.target, GL_TEXTURE_SRGB_DECODE_EXT, GL_DECODE_EXT);
-        }
-        glUseProgram(backgroundProgram.program);
-        glUniform4f(backgroundProgram.uColor, 1.0f, 1.0f, 1.0f, 1.0f);
-        glUniformMatrix4fv(backgroundProgram.uMvp, 1, GL_TRUE, eyeViewProjection.M[0]);
-        globe.Draw();
-        glBindTexture(bkg->texture.target, 0);
-        frameParms.WarpOptions = 0; // srgb
-        frameParms.WarpProgram = VRAPI_FRAME_PROGRAM_SIMPLE;
-        frameParms.LayerCount = 1;
-        frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].SrcBlend = VRAPI_FRAME_LAYER_BLEND_ONE;
-        frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].DstBlend = VRAPI_FRAME_LAYER_BLEND_ZERO;
-        frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].WriteAlpha = false;
-        frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_OVERLAY].Textures[eye].ColorTextureSwapChain = NULL;
-        for (int i = 0; i < 4; ++i) {
-          frameParms.ProgramParms[i] = 1.0f;
-        }
+    CoreTexture* tex = GetCoreTexture(bkgObj);
+    if (tex != NULL) {
+      // Set which texture we're working on
+      glActiveTexture(GL_TEXTURE0);
+
+      // Bind the texture
+      glBindTexture(tex->texture.target, tex->texture.texture);
+
+      // enable sRGB if we've got it
+      if (HasEXT_sRGB_texture_decode) {
+        glTexParameteri(tex->texture.target, GL_TEXTURE_SRGB_DECODE_EXT, GL_DECODE_EXT);
+      }
+
+      // Choose the correct program based on whether the texture is a cubemap
+      OVR::GlProgram prog = tex->cube ? cubeProgram : panoProgram;
+
+      // Use the program (at 100% brightness)
+      glUseProgram(prog.program);
+      glUniform4f(prog.uColor, 1.0f, 1.0f, 1.0f, 1.0f);
+
+      // Pass in our eye view projection matrix
+      glUniformMatrix4fv(prog.uMvp, 1, GL_TRUE, eyeViewProjection.M[0]);
+
+      // Draw the background texture on the surrounding globe
+      globe.Draw();
+
+      // Unbind the texture
+      glBindTexture(tex->texture.target, 0);
+
+      // Configure frame parms (mostly cargo cult from OVR example program)
+      frameParms.WarpOptions = 0; // srgb
+      frameParms.WarpProgram = VRAPI_FRAME_PROGRAM_SIMPLE;
+      frameParms.LayerCount = 1;
+      frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].SrcBlend = VRAPI_FRAME_LAYER_BLEND_ONE;
+      frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].DstBlend = VRAPI_FRAME_LAYER_BLEND_ZERO;
+      frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].WriteAlpha = false;
+      frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_OVERLAY].Textures[eye].ColorTextureSwapChain = NULL;
+      for (int i = 0; i < 4; ++i) {
+        frameParms.ProgramParms[i] = 1.0f;
       }
       OVR::GL_CheckErrors("draw");
     }
