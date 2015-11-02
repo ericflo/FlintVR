@@ -12,6 +12,7 @@ CoreGeometry::CoreGeometry(OVR::VertexAttribs* vert, OVR::Array<OVR::TriangleInd
 }
 
 CoreGeometry::~CoreGeometry(void) {
+  geometry->Free();
   delete geometry;
   delete vertices;
 }
