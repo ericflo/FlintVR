@@ -1,8 +1,5 @@
 #include "CoreScene.h"
 
-#ifndef LOG_COMPONENT
-#define LOG_COMPONENT "VrCubeWorld"
-#endif
 
 CoreScene::CoreScene(void) {
   lastCollisionTick = 0;

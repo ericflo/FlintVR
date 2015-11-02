@@ -1,8 +1,5 @@
 #include "CoreMatrix4f.h"
 
-#ifndef LOG_COMPONENT
-#define LOG_COMPONENT "VrCubeWorld"
-#endif
 
 static JSClass coreMatrix4fClass = {
   "Matrix4f",             /* name */

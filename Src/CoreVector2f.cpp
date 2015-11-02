@@ -1,8 +1,5 @@
 #include "CoreVector2f.h"
 
-#ifndef LOG_COMPONENT
-#define LOG_COMPONENT "VrCubeWorld"
-#endif
 
 static JSClass coreVector2fClass = {
   "Vector2f",             /* name */

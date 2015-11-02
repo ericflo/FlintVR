@@ -1,8 +1,5 @@
 #include "CoreProgram.h"
 
-#ifndef LOG_COMPONENT
-#define LOG_COMPONENT "VrCubeWorld"
-#endif
 
 CoreProgram::CoreProgram(void) {
   program = NULL;

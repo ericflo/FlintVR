@@ -1,9 +1,6 @@
 #include "CoreModel.h"
 #include "CoreScene.h"
 
-#ifndef LOG_COMPONENT
-#define LOG_COMPONENT "VrCubeWorld"
-#endif
 
 static int CURRENT_MODEL_ID = 1;
 

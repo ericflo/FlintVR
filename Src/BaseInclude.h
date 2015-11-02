@@ -14,4 +14,6 @@
 
 inline int bullet_btInfinityMask(){ return btInfinityMask; } // Hack to work around bullet bug
 
+#define LOG_COMPONENT "VrCubeWorld"
+
 #endif

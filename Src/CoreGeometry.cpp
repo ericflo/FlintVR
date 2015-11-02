@@ -1,9 +1,6 @@
 #include "CoreGeometry.h"
 #include "CoreVector3f.h"
 
-#ifndef LOG_COMPONENT
-#define LOG_COMPONENT "VrCubeWorld"
-#endif
 
 CoreGeometry::CoreGeometry(OVR::VertexAttribs* vert, OVR::Array<OVR::TriangleIndex> idc) {
   geometry = new OVR::GlGeometry(*vert, idc);

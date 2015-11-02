@@ -1,8 +1,5 @@
 #include "CoreVector4f.h"
 
-#ifndef LOG_COMPONENT
-#define LOG_COMPONENT "VrCubeWorld"
-#endif
 
 static JSClass coreVector4fClass = {
   "Vector4f",             /* name */

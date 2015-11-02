@@ -1,8 +1,5 @@
 #include "CoreTexture.h"
 
-#ifndef LOG_COMPONENT
-#define LOG_COMPONENT "VrCubeWorld"
-#endif
 
 CoreTexture::CoreTexture(
   JSContext* cx,
