@@ -21,7 +21,7 @@ LOCAL_SRC_FILES       += ../../../Src/CoreMatrix4f.cpp
 LOCAL_SRC_FILES       += ../../../Src/CoreCommon.cpp
 LOCAL_SRC_FILES       += ../../../Src/CoreTexture.cpp
 LOCAL_STATIC_LIBRARIES  += vrsound vrlocale vrgui vrappframework libovrkernel spidermonkey_static bullet_static
-LOCAL_SHARED_LIBRARIES  += vrapi libandroid mozglue-prebuilt
+LOCAL_SHARED_LIBRARIES  += vrapi libandroid mozglue-prebuilt assimp-prebuilt
 LOCAL_LDLIBS            += -landroid
 
 include $(BUILD_SHARED_LIBRARY)
@@ -35,3 +35,4 @@ $(call import-module,VrAppSupport/VrSound/Projects/Android/jni)
 $(call import-module,VrSamples/Native/VrCubeWorld_Framework/Projects/Android/deps/spidermonkey44/prebuilt/android)
 $(call import-module,VrSamples/Native/VrCubeWorld_Framework/Projects/Android/deps/libmozglue/prebuilt/android)
 $(call import-module,VrSamples/Native/VrCubeWorld_Framework/Projects/Android/deps/bullet)
+$(call import-module,VrSamples/Native/VrCubeWorld_Framework/Projects/Android/deps/assimp/prebuilt/android)

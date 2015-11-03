@@ -11,6 +11,9 @@
 #include "CoreCommon.h"
 #include "bullet/btBulletDynamicsCommon.h"
 #include "PackageFiles.h"
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 inline int bullet_btInfinityMask(){ return btInfinityMask; } // Hack to work around bullet bug
 
