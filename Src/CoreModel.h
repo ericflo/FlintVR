@@ -32,12 +32,6 @@ public:
   JS::Heap<JS::Value>* selfVal;
 
   // Engine objects
-  CoreGeometry* geometry(JSContext* cx);
-  CoreProgram* program(JSContext* cx);
-  OVR::Matrix4f* matrix(JSContext* cx);
-  OVR::Vector3f* position(JSContext* cx);
-  OVR::Vector3f* rotation(JSContext* cx);
-  OVR::Vector3f* scale(JSContext* cx);
   JS::Heap<JS::Value>* geometryVal;
   JS::Heap<JS::Value>* programVal;
   JS::Heap<JS::Value>* matrixVal;
@@ -45,7 +39,21 @@ public:
   JS::Heap<JS::Value>* rotationVal;
   JS::Heap<JS::Value>* scaleVal;
 
+  // Engine helper methods (may remove these, they're not that helpful)
+  CoreGeometry* geometry(JSContext* cx);
+  CoreProgram* program(JSContext* cx);
+  OVR::Matrix4f* matrix(JSContext* cx);
+  OVR::Vector3f* position(JSContext* cx);
+  OVR::Vector3f* rotation(JSContext* cx);
+  OVR::Vector3f* scale(JSContext* cx);
+
   JS::Heap<JS::Value>* textureVal;
+
+  // Text
+  JS::Heap<JS::Value>* textVal;
+  JS::Heap<JS::Value>* textColorVal;
+  float textSize;
+  float textOutlineSize;
 
   // Collision properties
   JS::Heap<JS::Value>* collideTagVal;
@@ -79,8 +87,8 @@ public:
   bool RemoveModel(JSContext* cx, CoreModel* model);
   void ComputeMatrices(JSContext* cx, OVR::Matrix4f& transform);
   void CallFrameCallbacks(JSContext* cx, JS::HandleValue ev);
-  void CallGazeCallbacks(JSContext* cx,  OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev);
-  void DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms);
+  void CallGazeCallbacks(JSContext* cx, OVR::OvrGuiSys* guiSys, OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev);
+  void DrawEyeView(JSContext* cx, OVR::OvrGuiSys* guiSys, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms);
   bool HasFrameCallback();
   bool HasGazeCallback();
   bool HasGestureCallback();

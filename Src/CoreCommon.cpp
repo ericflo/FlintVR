@@ -8,14 +8,6 @@ void SetMaybeCallback(JSContext* cx, JS::RootedObject* opts, const char* name, J
   *out = new JS::Heap<JS::Value>(callbackVal);
 }
 
-bool EnsureJSObject(JSContext* cx, JS::MutableHandleValue vp) {
-  if (!vp.isObject()) {
-    JS_ReportError(cx, "Unexpected argument (expected object)");
-    return false;
-  }
-  return true;
-}
-
 bool GetOVRStringVal(JSContext* cx, JS::HandleValue val, OVR::String* out) {
   if (!val.isString()) {
     JS_ReportError(cx, "Expected a string");
@@ -46,4 +38,8 @@ bool GetOVRString(JSContext* cx, JS::HandleString s, OVR::String* out) {
   delete[] sBuf;
   
   return true;
+}
+
+bool ValueDefined(JS::Heap<JS::Value>* val) {
+  return val != NULL && !val->isNullOrUndefined();
 }

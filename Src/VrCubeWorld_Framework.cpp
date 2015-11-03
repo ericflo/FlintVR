@@ -98,7 +98,7 @@ void VrCubeWorld::OneTimeInit(const char* fromPackageName, const char* launchInt
   //app->SetShowFPS(true);
 
   // Load the script into memory
-  const char* filename = "hello6.js";
+  const char* filename = "hello7.js";
   AAsset* asset = AAssetManager_open(AssetManager, filename, AASSET_MODE_BUFFER);
   if (NULL == asset) {
     __android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "ASSET NOT FOUND: %s", filename);
@@ -233,7 +233,7 @@ OVR::Matrix4f VrCubeWorld::Frame(const OVR::VrFrame& vrFrame) {
 
     coreScene->ComputeMatrices(cx);
     coreScene->CallFrameCallbacks(cx, evValue);
-    coreScene->CallGazeCallbacks(cx, viewPos, viewFwd, vrFrame, evValue);
+    coreScene->CallGazeCallbacks(cx, GuiSys, viewPos, viewFwd, vrFrame, evValue);
     coreScene->PerformCollisionDetection(cx, now, evValue);
   }
 
@@ -253,7 +253,7 @@ OVR::Matrix4f VrCubeWorld::DrawEyeView(const int eye, const float fovDegreesX, c
   JS::RootedObject global(cx, SpidermonkeyGlobal.ref());
   {
     JSAutoCompartment ac(cx, global);
-    coreScene->DrawEyeView(cx, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
+    coreScene->DrawEyeView(cx, GuiSys, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
   }
 
   GuiSys->RenderEyeView( CenterEyeViewMatrix, eyeViewProjection );

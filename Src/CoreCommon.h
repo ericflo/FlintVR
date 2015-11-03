@@ -53,8 +53,8 @@ const static int VERTEX_JOINT_WEIGHTS = 8;
   }
 
 void SetMaybeCallback(JSContext* cx, JS::RootedObject* opts, const char* name, JS::Heap<JS::Value>** out);
-bool EnsureJSObject(JSContext* cx, JS::MutableHandleValue vp);
 bool GetOVRStringVal(JSContext* cx, JS::HandleValue val, OVR::String* out);
 bool GetOVRString(JSContext* cx, JS::HandleString s, OVR::String* out);
+bool ValueDefined(JS::Heap<JS::Value>* val);
 
 #endif

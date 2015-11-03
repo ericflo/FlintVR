@@ -115,11 +115,11 @@ void CoreScene::CallFrameCallbacks(JSContext* cx, JS::HandleValue ev) {
   }
 }
 
-void CoreScene::CallGazeCallbacks(JSContext* cx,  OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev) {
+void CoreScene::CallGazeCallbacks(JSContext* cx, OVR::OvrGuiSys* guiSys, OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev) {
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
     CoreModel* child = GetCoreModel(childObj);
-    child->CallGazeCallbacks(cx, viewPos, viewFwd, vrFrame, ev);
+    child->CallGazeCallbacks(cx, guiSys, viewPos, viewFwd, vrFrame, ev);
   }
 }
 
@@ -160,7 +160,7 @@ void CoreScene::PerformCollisionDetection(JSContext* cx, double now, JS::HandleV
   }
 }
 
-void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms) {
+void CoreScene::DrawEyeView(JSContext* cx, OVR::OvrGuiSys* guiSys, const int eye, const OVR::Matrix4f& eyeViewMatrix, const OVR::Matrix4f& eyeProjectionMatrix, const OVR::Matrix4f& eyeViewProjection, ovrFrameParms& frameParms) {
   JS::RootedObject rootedClearColorVal(cx, &clearColorVal->toObject());
   OVR::Vector4f* clearClr = GetVector4f(rootedClearColorVal);
   glClearColor(clearClr->x, clearClr->y, clearClr->z, clearClr->w);
@@ -216,7 +216,7 @@ void CoreScene::DrawEyeView(JSContext* cx, const int eye, const OVR::Matrix4f& e
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
     CoreModel* child = GetCoreModel(childObj);
-    child->DrawEyeView(cx, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
+    child->DrawEyeView(cx, guiSys, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
   }
 
   glBindVertexArray(0);

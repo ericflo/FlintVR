@@ -7,12 +7,16 @@ static int CURRENT_MODEL_ID = 1;
 CoreModel::CoreModel(void) :
   isHovered(false),
   isTouching(false),
+  textSize(12.0f),
+  textOutlineSize(0.0f),
   localMatrix(),
   worldMatrix() {
   id = CURRENT_MODEL_ID++;
   collisionShape = NULL;
   collisionObj = NULL;
   textureVal = NULL;
+  textVal = NULL;
+  textColorVal = NULL;
 }
 
 CoreModel::~CoreModel(void) {
@@ -20,6 +24,8 @@ CoreModel::~CoreModel(void) {
   delete geometryVal;
   delete programVal;
   delete textureVal;
+  delete textVal;
+  delete textColorVal;
   delete matrixVal;
   delete positionVal;
   delete rotationVal;
@@ -123,30 +129,79 @@ void CoreModel::CallFrameCallbacks(JSContext* cx, JS::HandleValue ev) {
   }
 }
 
-void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev) {
+void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::OvrGuiSys* guiSys, OVR::Vector3f* viewPos, OVR::Vector3f* viewFwd, const OVR::VrFrame& vrFrame, JS::HandleValue ev) {
   bool touchPressed = ( vrFrame.Input.buttonPressed & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
   bool touchReleased = !touchPressed && ( vrFrame.Input.buttonReleased & ( OVR::BUTTON_TOUCH | OVR::BUTTON_A ) ) != 0;
   bool touchDown = ( vrFrame.Input.buttonState & OVR::BUTTON_TOUCH ) != 0;
 
   if (HasGazeCallback() || HasGestureCallback()) {
     JS::RootedObject self(cx, &selfVal->toObject());
-    CoreGeometry* geom = geometry(cx);
 
     bool foundIntersection = false;
-    OVR::Array<OVR::Vector3f> vertices = geom->vertices->position;
-    for (int j = 0; j < geom->indices.GetSizeI(); j += 3) {
-      OVR::Vector3f v0 = worldMatrix.Transform(vertices[geom->indices[j]]);
-      OVR::Vector3f v1 = worldMatrix.Transform(vertices[geom->indices[j + 1]]);
-      OVR::Vector3f v2 = worldMatrix.Transform(vertices[geom->indices[j + 2]]);
-      float t0, u, v;
-      if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
-        foundIntersection = true;
-        break;
+
+    // First check for intersection via the regular geometry
+    if (ValueDefined(geometryVal)) {
+      CoreGeometry* geom = geometry(cx);
+      OVR::Array<OVR::Vector3f> vertices = geom->vertices->position;
+      for (int j = 0; j < geom->indices.GetSizeI(); j += 3) {
+        OVR::Vector3f v0 = worldMatrix.Transform(vertices[geom->indices[j]]);
+        OVR::Vector3f v1 = worldMatrix.Transform(vertices[geom->indices[j + 1]]);
+        OVR::Vector3f v2 = worldMatrix.Transform(vertices[geom->indices[j + 2]]);
+        float t0, u, v;
+        if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v0, v1, v2, t0, u, v)) {
+          foundIntersection = true;
+          break;
+        }
+        // Check the backface
+        if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v2, v1, v0, t0, u, v)) {
+          foundIntersection = true;
+          break;
+        }
       }
-      // Check the backface
-      if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, v2, v1, v0, t0, u, v)) {
+    }
+
+    // Next check if text boundaries have been intersected
+    if (ValueDefined(textVal)) {
+      OVR::String txtStr;
+      JS::RootedValue t(cx, *textVal);
+      if (!GetOVRStringVal(cx, t, &txtStr)) {
+        JS_ReportError(cx, "Could not get string data from text string");
+        return;
+      }
+
+      // Get metrics from the text (width/height is all we care about for now)
+      size_t txtLen;
+      float txtWidth;
+      float txtHeight;
+      float txtAscent;
+      float txtDescent;
+      float txtFontHeight;
+      int const TXT_MAX_LINES = 128;
+      float txtLineWidths[TXT_MAX_LINES];
+      int txtNumLines;
+      guiSys->GetDefaultFont().CalcTextMetrics(txtStr.ToCStr(), txtLen,
+        txtWidth, txtHeight, txtAscent, txtDescent, txtFontHeight,
+        txtLineWidths, TXT_MAX_LINES, txtNumLines);
+
+      // Build quad vertices from the metrics + the model matrix
+      OVR::Vector3f bl = worldMatrix.GetTranslation();
+      OVR::Vector3f br = worldMatrix.Transform(OVR::Vector3f(txtWidth * textSize, 0, 0));
+      OVR::Vector3f tl = worldMatrix.Transform(OVR::Vector3f(0, txtHeight * textSize, 0));
+      OVR::Vector3f tr = worldMatrix.Transform(OVR::Vector3f(txtWidth * textSize, txtHeight * textSize, 0));
+
+      float t0, u, v;
+      // Triangle 1
+      if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, br, bl, tl, t0, u, v)) {
         foundIntersection = true;
-        break;
+      } else if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, tl, bl, br, t0, u, v)) {
+        // Check the backface
+        foundIntersection = true;
+      } else if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, br, tr, tl, t0, u, v)) {
+        // Triangle 2
+        foundIntersection = true;
+      } else if (OVR::Intersect_RayTriangle(*viewPos, *viewFwd, tl, tr, br, t0, u, v)) {
+        // Check the backface
+        foundIntersection = true;
       }
     }
 
@@ -157,7 +212,7 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
       if (!isHovered) {
         isHovered = true;
         // Call the onGazeHoverOver callback
-        if (CallbackDefined(onGazeHoverOverVal)) {
+        if (ValueDefined(onGazeHoverOverVal)) {
           callback = JS::RootedValue(cx, *onGazeHoverOverVal);
           // TODO: Construct an object (with t0, u, v ?) to add to env
           if (!JS_CallFunctionValue(cx, self, callback,
@@ -170,7 +225,7 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
       if (!isTouching && touchPressed) {
         isTouching = true;
         // TODO: Construct an object (with t0, u, v ?) to add to env
-        if (CallbackDefined(onGestureTouchDownVal)) {
+        if (ValueDefined(onGestureTouchDownVal)) {
           callback = JS::RootedValue(cx, *onGestureTouchDownVal);
           if (!JS_CallFunctionValue(cx, self, callback,
                                     JS::HandleValueArray(evVal), &rval)) {
@@ -182,7 +237,7 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
       if ((isTouching && touchReleased) || (isTouching && !touchDown)) {
         isTouching = false;
         // TODO: Construct an object (with t0, u, v ?) to add to env
-        if (CallbackDefined(onGestureTouchUpVal)) {
+        if (ValueDefined(onGestureTouchUpVal)) {
           callback = JS::RootedValue(cx, *onGestureTouchUpVal);
           if (!JS_CallFunctionValue(cx, self, callback,
                                     JS::HandleValueArray(evVal), &rval)) {
@@ -194,7 +249,7 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
     } else {
       if (isTouching) {
         isTouching = false;
-        if (CallbackDefined(onGestureTouchCancelVal)) {
+        if (ValueDefined(onGestureTouchCancelVal)) {
           callback = JS::RootedValue(cx, *onGestureTouchCancelVal);
           if (!JS_CallFunctionValue(cx, self, callback,
                                     JS::HandleValueArray(evVal), &rval)) {
@@ -205,7 +260,7 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
 
       if (isHovered) {
         isHovered = false;
-        if (CallbackDefined(onGazeHoverOutVal)) {
+        if (ValueDefined(onGazeHoverOutVal)) {
           callback = JS::RootedValue(cx, *onGazeHoverOutVal);
           if (!JS_CallFunctionValue(cx, self, callback,
                                     JS::HandleValueArray(evVal), &rval)) {
@@ -219,133 +274,168 @@ void CoreModel::CallGazeCallbacks(JSContext* cx, OVR::Vector3f* viewPos, OVR::Ve
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
     CoreModel* child = GetCoreModel(childObj);
-    child->CallGazeCallbacks(cx, viewPos, viewFwd, vrFrame, ev);
+    child->CallGazeCallbacks(cx, guiSys, viewPos, viewFwd, vrFrame, ev);
   }
 }
 
-void CoreModel::DrawEyeView(JSContext* cx, const int eye,
+void CoreModel::DrawEyeView(JSContext* cx,
+                            OVR::OvrGuiSys* guiSys,
+                            const int eye,
                             const OVR::Matrix4f& eyeViewMatrix,
                             const OVR::Matrix4f& eyeProjectionMatrix,
                             const OVR::Matrix4f& eyeViewProjection,
                             ovrFrameParms& frameParms) {
-  // Extract the rendering primitives
-  OVR::GlProgram* prog = program(cx)->program;
-  OVR::GlGeometry* geom = geometry(cx)->geometry;
+  if (ValueDefined(geometryVal) && ValueDefined(programVal)) {
+    // Extract the rendering primitives
+    OVR::GlProgram* prog = program(cx)->program;
+    OVR::GlGeometry* geom = geometry(cx)->geometry;
 
-  // Switch to our program
-  glUseProgram(prog->program);
+    // Switch to our program
+    glUseProgram(prog->program);
 
-  // Use the current texture
-  if (textureVal != NULL && !textureVal->isNullOrUndefined() && textureVal->isObject()) {
-    JS::RootedObject texObj(cx, &textureVal->toObject());
-    CoreTexture* tex = GetCoreTexture(texObj);
-    if (tex != NULL) {
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(tex->texture.target, tex->texture.texture);
+    // Use the current texture
+    if (textureVal != NULL && !textureVal->isNullOrUndefined() && textureVal->isObject()) {
+      JS::RootedObject texObj(cx, &textureVal->toObject());
+      CoreTexture* tex = GetCoreTexture(texObj);
+      if (tex != NULL) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(tex->texture.target, tex->texture.texture);
+      }
     }
-  }
 
-  // Now we bind our uniforms
-  glUniformMatrix4fv(prog->uModel, 1, GL_TRUE, worldMatrix.M[0]);
-  glUniformMatrix4fv(prog->uView, 1, GL_TRUE, eyeViewMatrix.M[0]);
-  glUniformMatrix4fv(prog->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0]);
+    // Now we bind our uniforms
+    glUniformMatrix4fv(prog->uModel, 1, GL_TRUE, worldMatrix.M[0]);
+    glUniformMatrix4fv(prog->uView, 1, GL_TRUE, eyeViewMatrix.M[0]);
+    glUniformMatrix4fv(prog->uProjection, 1, GL_TRUE, eyeProjectionMatrix.M[0]);
 
-  JS::RootedObject uniforms(cx, &uniformsVal->toObject());
-  JS::Rooted<JS::IdVector> names(cx, JS::IdVector(cx));
-  if (!JS_Enumerate(cx, uniforms, &names)) {
-    JS_ReportError(cx, "Couldn't enumerate uniforms");
-    return;
-  }
-  JS::RootedValue nameVal(cx);
-  JS::RootedValue val(cx);
-  OVR::String name;
-  for (uint32_t i = 0; i < names.length(); ++i) {
-    // Root the ID
-    JS::RootedId nameId(cx, names[i]);
-
-    // Get the name string as a value
-    if (!JS_IdToValue(cx, nameId, &nameVal)) {
-      JS_ReportError(cx, "Could not convert the uniform id to a value");
+    JS::RootedObject uniforms(cx, &uniformsVal->toObject());
+    JS::Rooted<JS::IdVector> names(cx, JS::IdVector(cx));
+    if (!JS_Enumerate(cx, uniforms, &names)) {
+      JS_ReportError(cx, "Couldn't enumerate uniforms");
       return;
     }
+    JS::RootedValue nameVal(cx);
+    JS::RootedValue val(cx);
+    OVR::String name;
+    for (uint32_t i = 0; i < names.length(); ++i) {
+      // Root the ID
+      JS::RootedId nameId(cx, names[i]);
 
-    // Get the string out of the name value
-    if (!GetOVRStringVal(cx, nameVal, &name)) {
-      JS_ReportError(cx, "Could not convert the uniform name to a string");
-      return;
-    }
+      // Get the name string as a value
+      if (!JS_IdToValue(cx, nameId, &nameVal)) {
+        JS_ReportError(cx, "Could not convert the uniform id to a value");
+        return;
+      }
 
-    // Get the value from the id
-    if (!JS_GetPropertyById(cx, uniforms, nameId, &val)) {
-      JS_ReportError(cx, "Could not get the uniform value");
-      return;
-    }
+      // Get the string out of the name value
+      if (!GetOVRStringVal(cx, nameVal, &name)) {
+        JS_ReportError(cx, "Could not convert the uniform name to a string");
+        return;
+      }
 
-    // Get the location of the uniform
-    int loc = glGetUniformLocation(prog->program, name.ToCStr());
+      // Get the value from the id
+      if (!JS_GetPropertyById(cx, uniforms, nameId, &val)) {
+        JS_ReportError(cx, "Could not get the uniform value");
+        return;
+      }
 
-    // Figure out what type the uniform is and then set it
-    if (val.isBoolean()) {
-      glUniform1i(loc, val.isTrue() ? 1 : 0);
-    } else if (val.isNumber()) {
-      glUniform1f(loc, val.toNumber());
-    } else if (val.isObject()) {
-      JS::RootedObject valObj(cx, &val.toObject());
-      if (JS_InstanceOf(cx, valObj, CoreVector2f_class(), NULL)) {
-        OVR::Vector2f* vec = GetVector2f(valObj);
-        glUniform2fv(loc, 1, &vec->x);
-      } else if (JS_InstanceOf(cx, valObj, CoreVector3f_class(), NULL)) {
-        OVR::Vector3f* vec = GetVector3f(valObj);
-        glUniform3fv(loc, 1, &vec->x);
-      } else if (JS_InstanceOf(cx, valObj, CoreVector4f_class(), NULL)) {
-        OVR::Vector4f* vec = GetVector4f(valObj);
-        glUniform4fv(loc, 1, &vec->x);
-      } else if (JS_InstanceOf(cx, valObj, CoreMatrix4f_class(), NULL)) {
-        OVR::Matrix4f* mat = GetMatrix4f(valObj);
-        glUniformMatrix4fv(loc, 1, GL_TRUE, mat->M[0]);
+      // Get the location of the uniform
+      int loc = glGetUniformLocation(prog->program, name.ToCStr());
+
+      // Figure out what type the uniform is and then set it
+      if (val.isBoolean()) {
+        glUniform1i(loc, val.isTrue() ? 1 : 0);
+      } else if (val.isNumber()) {
+        glUniform1f(loc, val.toNumber());
+      } else if (val.isObject()) {
+        JS::RootedObject valObj(cx, &val.toObject());
+        if (JS_InstanceOf(cx, valObj, CoreVector2f_class(), NULL)) {
+          OVR::Vector2f* vec = GetVector2f(valObj);
+          glUniform2fv(loc, 1, &vec->x);
+        } else if (JS_InstanceOf(cx, valObj, CoreVector3f_class(), NULL)) {
+          OVR::Vector3f* vec = GetVector3f(valObj);
+          glUniform3fv(loc, 1, &vec->x);
+        } else if (JS_InstanceOf(cx, valObj, CoreVector4f_class(), NULL)) {
+          OVR::Vector4f* vec = GetVector4f(valObj);
+          glUniform4fv(loc, 1, &vec->x);
+        } else if (JS_InstanceOf(cx, valObj, CoreMatrix4f_class(), NULL)) {
+          OVR::Matrix4f* mat = GetMatrix4f(valObj);
+          glUniformMatrix4fv(loc, 1, GL_TRUE, mat->M[0]);
+        } else {
+          JS_ReportError(cx, "Uniform type unknown");
+          return;
+        }
       } else {
         JS_ReportError(cx, "Uniform type unknown");
         return;
       }
-    } else {
-      JS_ReportError(cx, "Uniform type unknown");
-      return;
     }
+
+    // Bind the vertex array
+    glBindVertexArray(geom->vertexArrayObject);
+
+    // Finally, draw the elements
+    glDrawElements(GL_TRIANGLES, geom->indexCount, GL_UNSIGNED_SHORT, NULL);
+
+    // Unbind
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindVertexArray(0);
+    glUseProgram(0);
   }
 
-  // Bind the vertex array
-  glBindVertexArray(geom->vertexArrayObject);
+  // Render text if we have some
+  if (ValueDefined(textVal)) {
+    OVR::String textStr;
+    JS::RootedValue t(cx, *textVal);
+    if (!GetOVRStringVal(cx, t, &textStr)) {
+      JS_ReportError(cx, "Could not get string data from text string");
+      return;
+    }
 
-  // Finally, draw the elements
-  glDrawElements(GL_TRIANGLES, geom->indexCount, GL_UNSIGNED_SHORT, NULL);
+    OVR::Vector4f textColor(0, 0, 0, 1);
+    if (ValueDefined(textColorVal)) {
+      JS::RootedObject textColorObj(cx, &textColorVal->toObject());
+      textColor = *(GetVector4f(textColorObj));
+    }
+
+    OVR::fontParms_t fontParms;
+    fontParms.AlphaCenter = 0.50f - textOutlineSize;
+    fontParms.ColorCenter = 0.50f;
+
+    guiSys->GetDefaultFontSurface().DrawText3D(
+      guiSys->GetDefaultFont(),
+      fontParms,
+      worldMatrix.GetTranslation(),
+      OVR::Vector3f(worldMatrix.M[2][0], worldMatrix.M[2][1], worldMatrix.M[2][2]),
+      OVR::Vector3f(worldMatrix.M[1][0], worldMatrix.M[1][1], worldMatrix.M[1][2]),
+      textSize,
+      textColor,
+      textStr.ToCStr()
+    );
+  }
 
   // Recurse
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
     CoreModel* child = GetCoreModel(childObj);
-    child->DrawEyeView(cx, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
+    child->DrawEyeView(cx, guiSys, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
   }
-
-  // Unbind
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, 0);
-  glBindVertexArray(0);
-  glUseProgram(0);
 }
 
 bool CoreModel::HasFrameCallback() {
-  return CallbackDefined(onFrameVal);
+  return ValueDefined(onFrameVal);
 }
 
 bool CoreModel::HasGazeCallback() {
-  return CallbackDefined(onGazeHoverOverVal) || CallbackDefined(onGazeHoverOutVal);
+  return ValueDefined(onGazeHoverOverVal) || ValueDefined(onGazeHoverOutVal);
 }
 
 bool CoreModel::HasGestureCallback() {
   return (
-    CallbackDefined(onGestureTouchDownVal) ||
-    CallbackDefined(onGestureTouchUpVal) ||
-    CallbackDefined(onGestureTouchCancelVal)
+    ValueDefined(onGestureTouchDownVal) ||
+    ValueDefined(onGestureTouchUpVal) ||
+    ValueDefined(onGestureTouchCancelVal)
   );
 }
 
@@ -363,39 +453,41 @@ btTransform CoreModel::GetTransform() {
 }
 
 void CoreModel::StartCollisions(JSContext* cx) {
-  if (collisionShape != NULL) {
-    delete collisionShape;
-    collisionShape = NULL;
+  if (ValueDefined(geometryVal)) {
+    if (collisionShape != NULL) {
+      delete collisionShape;
+      collisionShape = NULL;
+    }
+    if (collisionObj != NULL) {
+      delete collisionObj;
+      collisionObj = NULL;
+    }
+    // TODO: Ensure there are none missing
+
+    CoreGeometry *geom = geometry(cx);
+
+    triMesh = new btTriangleMesh();
+    for (int i = 0; i < geom->indices.GetSizeI(); i += 3) {
+      OVR::Vector3f v0 = geom->vertices->position[geom->indices[i]];
+      OVR::Vector3f v1 = geom->vertices->position[geom->indices[i + 1]];
+      OVR::Vector3f v2 = geom->vertices->position[geom->indices[i + 2]];
+      triMesh->addTriangle(
+        btVector3(v0.x, v0.y, v0.z),
+        btVector3(v1.x, v1.y, v1.z),
+        btVector3(v2.x, v2.y, v2.z)
+      );
+    }
+    collisionShape = new btConvexTriangleMeshShape(triMesh, true);
+
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(btScalar(1.0), NULL,
+      collisionShape, btVector3(0, 0, 0));
+    btRigidBody* body = new btRigidBody(rbInfo);
+
+    scene->dynamicsWorld->addRigidBody(body);
+
+    collisionObj = static_cast<btCollisionObject*>(body);
+    collisionObj->setUserIndex(id);
   }
-  if (collisionObj != NULL) {
-    delete collisionObj;
-    collisionObj = NULL;
-  }
-  // TODO: Ensure there are none missing
-
-  CoreGeometry *geom = geometry(cx);
-
-  triMesh = new btTriangleMesh();
-  for (int i = 0; i < geom->indices.GetSizeI(); i += 3) {
-    OVR::Vector3f v0 = geom->vertices->position[geom->indices[i]];
-    OVR::Vector3f v1 = geom->vertices->position[geom->indices[i + 1]];
-    OVR::Vector3f v2 = geom->vertices->position[geom->indices[i + 2]];
-    triMesh->addTriangle(
-      btVector3(v0.x, v0.y, v0.z),
-      btVector3(v1.x, v1.y, v1.z),
-      btVector3(v2.x, v2.y, v2.z)
-    );
-  }
-  collisionShape = new btConvexTriangleMeshShape(triMesh, true);
-
-  btRigidBody::btRigidBodyConstructionInfo rbInfo(btScalar(1.0), NULL,
-    collisionShape, btVector3(0, 0, 0));
-  btRigidBody* body = new btRigidBody(rbInfo);
-
-  scene->dynamicsWorld->addRigidBody(body);
-
-  collisionObj = static_cast<btCollisionObject*>(body);
-  collisionObj->setUserIndex(id);
 
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
@@ -431,7 +523,9 @@ void CoreModel::StopCollisions() {
 }
 
 void CoreModel::UpdateCollisionObjects(JSContext* cx) {
-  collisionObj->setWorldTransform(GetTransform());
+  if (collisionObj != NULL) {
+    collisionObj->setWorldTransform(GetTransform());
+  }
   for (int i = 0; i < children.GetSizeI(); ++i) {
     JS::RootedObject childObj(cx, &children[i].toObject());
     CoreModel* child = GetCoreModel(childObj);
@@ -475,7 +569,7 @@ void CoreModel::CollidedWith(JSContext* cx, CoreModel* otherModel, JS::HandleVal
   }
 
   // If we made it here, it's a new collision, so trigger a callback
-  if (CallbackDefined(onCollideStartVal)) {
+  if (ValueDefined(onCollideStartVal)) {
     JS::RootedValue callback(cx, *onCollideStartVal);
     JS::RootedValue rval(cx);
     JS::RootedValue evVal(cx, ev);
@@ -499,7 +593,7 @@ void CoreModel::FinishCollisions(JSContext* cx, JS::HandleValue ev) {
       }
     }
     if (!found) {
-      if (CallbackDefined(onCollideEndVal)) {
+      if (ValueDefined(onCollideEndVal)) {
         JS::RootedValue callback(cx, *onCollideEndVal);
         //CoreModel* otherModel = scene->ModelById(cx, collidingWithIds[i]);
         JS::RootedValue rval(cx);
@@ -554,11 +648,13 @@ static JSClass coreModelClass = {
 
 VRJS_GETSET(CoreModel, geometry)
 VRJS_GETSET(CoreModel, program)
-VRJS_GETSET(CoreModel, texture)
 VRJS_GETSET(CoreModel, matrix)
 VRJS_GETSET(CoreModel, position)
 VRJS_GETSET(CoreModel, rotation)
 VRJS_GETSET(CoreModel, scale)
+VRJS_GETSET(CoreModel, texture)
+VRJS_GETSET(CoreModel, text)
+VRJS_GETSET(CoreModel, textColor)
 VRJS_GETSET(CoreModel, collideTag)
 VRJS_GETSET(CoreModel, collidesWith)
 VRJS_GETSET(CoreModel, uniforms)
@@ -571,14 +667,58 @@ VRJS_GETSET(CoreModel, onGestureTouchCancel)
 VRJS_GETSET(CoreModel, onCollideStart)
 VRJS_GETSET(CoreModel, onCollideEnd)
 
+static bool CoreModel_get_textSize(JSContext* cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  CoreModel* item = GetCoreModel(self);
+  args.rval().setNumber(item->textSize);
+  return true;
+}
+
+static bool CoreModel_set_textSize(JSContext* cx, unsigned argc, JS::Value* vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!args[0].isNumber()) {
+    JS_ReportError(cx, "Invalid number specified");
+    return false;
+  }
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  CoreModel* item = GetCoreModel(self);
+  item->textSize = args[0].toNumber();
+  return true;
+}
+
+static bool CoreModel_get_textOutlineSize(JSContext* cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  CoreModel* item = GetCoreModel(self);
+  args.rval().setNumber(item->textOutlineSize);
+  return true;
+}
+
+static bool CoreModel_set_textOutlineSize(JSContext* cx, unsigned argc, JS::Value* vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!args[0].isNumber()) {
+    JS_ReportError(cx, "Invalid number specified");
+    return false;
+  }
+  JS::RootedObject self(cx, &args.thisv().toObject());
+  CoreModel* item = GetCoreModel(self);
+  item->textOutlineSize = args[0].toNumber();
+  return true;
+}
+
 static JSPropertySpec CoreModel_props[] = {
   VRJS_PROP(CoreModel, geometry),
   VRJS_PROP(CoreModel, program),
-  VRJS_PROP(CoreModel, texture),
   VRJS_PROP(CoreModel, matrix),
   VRJS_PROP(CoreModel, position),
   VRJS_PROP(CoreModel, rotation),
   VRJS_PROP(CoreModel, scale),
+  VRJS_PROP(CoreModel, texture),
+  VRJS_PROP(CoreModel, text),
+  VRJS_PROP(CoreModel, textColor),
+  VRJS_PROP(CoreModel, textSize),
+  VRJS_PROP(CoreModel, textOutlineSize),
   VRJS_PROP(CoreModel, collideTag),
   VRJS_PROP(CoreModel, collidesWith),
   VRJS_PROP(CoreModel, uniforms),
@@ -626,94 +766,88 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 
   // Geometry
   JS::RootedValue geometry(cx);
-  if (!JS_GetProperty(cx, opts, "geometry", &geometry)) {
-    JS_ReportError(cx, "Could not find 'geometry' option");
-    delete model;
-    return false;
+  if (JS_GetProperty(cx, opts, "geometry", &geometry) && !geometry.isNullOrUndefined() && geometry.isObject()) {
+    model->geometryVal = new JS::Heap<JS::Value>(geometry);
   }
-  if (!EnsureJSObject(cx, &geometry)) {
-    delete model;
-    return false;
-  }
-  model->geometryVal = new JS::Heap<JS::Value>(geometry);
 
   // Program
   JS::RootedValue program(cx);
-  if (!JS_GetProperty(cx, opts, "program", &program)) {
-    JS_ReportError(cx, "Could not find 'program' option");
-    delete model;
-    return false;
+  if (JS_GetProperty(cx, opts, "program", &program) && !program.isNullOrUndefined() && program.isObject()) {
+    model->programVal = new JS::Heap<JS::Value>(program);
   }
-  if (!EnsureJSObject(cx, &program)) {
-    delete model;
-    return false;
-  }
-  model->programVal = new JS::Heap<JS::Value>(program);
 
   // Texture
   JS::RootedValue texture(cx);
-  if (JS_GetProperty(cx, opts, "texture", &texture) && !texture.isNullOrUndefined()) {
+  if (JS_GetProperty(cx, opts, "texture", &texture) && !texture.isNullOrUndefined() && texture.isObject()) {
     model->textureVal = new JS::Heap<JS::Value>(texture);
+  }
+
+  // Text
+  JS::RootedValue text(cx);
+  if (JS_GetProperty(cx, opts, "text", &text) && !text.isNullOrUndefined() && text.isString()) {
+    model->textVal = new JS::Heap<JS::Value>(text);
+  }
+
+  // TextColor
+  JS::RootedValue textColor(cx);
+  if (JS_GetProperty(cx, opts, "textColor", &textColor) && !textColor.isNullOrUndefined() && textColor.isObject()) {
+    model->textColorVal = new JS::Heap<JS::Value>(textColor);
+  }
+
+  // TextSize
+  JS::RootedValue textSizeVal(cx);
+  if (JS_GetProperty(cx, opts, "textSize", &textSizeVal) && !textSizeVal.isNullOrUndefined() && textSizeVal.isNumber()) {
+    model->textSize = textSizeVal.toNumber();
+  }
+
+  // TextOutlineSize
+  JS::RootedValue textOutlineSizeVal(cx);
+  if (JS_GetProperty(cx, opts, "textOutlineSize", &textOutlineSizeVal) && !textOutlineSizeVal.isNullOrUndefined() && textOutlineSizeVal.isNumber()) {
+    model->textOutlineSize = textOutlineSizeVal.toNumber();
   }
 
   // Base transform matrix
   JS::RootedValue matrix(cx);
-  if (!JS_GetProperty(cx, opts, "transform", &matrix) || matrix.isNullOrUndefined()) {
+  if (JS_GetProperty(cx, opts, "transform", &matrix) || matrix.isNullOrUndefined() || !matrix.isObject()) {
     matrix = JS::RootedValue(cx,
       JS::ObjectOrNullValue(NewCoreMatrix4f(cx, new OVR::Matrix4f())));
-  }
-  if (!EnsureJSObject(cx, &matrix)) {
-    delete model;
-    return false;
   }
   model->matrixVal = new JS::Heap<JS::Value>(matrix);
 
   // Position
   JS::RootedValue position(cx);
-  if (!JS_GetProperty(cx, opts, "position", &position) || position.isNullOrUndefined()) {
+  if (!JS_GetProperty(cx, opts, "position", &position) || position.isNullOrUndefined() || !position.isObject()) {
     position = JS::RootedValue(cx,
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f())));
-  }
-  if (!EnsureJSObject(cx, &position)) {
-    delete model;
-    return false;
   }
   model->positionVal = new JS::Heap<JS::Value>(position);
 
   // Rotation
   JS::RootedValue rotation(cx);
-  if (!JS_GetProperty(cx, opts, "rotation", &rotation) || rotation.isNullOrUndefined()) {
+  if (!JS_GetProperty(cx, opts, "rotation", &rotation) || rotation.isNullOrUndefined() || !rotation.isObject()) {
     rotation = JS::RootedValue(cx,
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f())));
-  }
-  if (!EnsureJSObject(cx, &rotation)) {
-    delete model;
-    return false;
   }
   model->rotationVal = new JS::Heap<JS::Value>(rotation);
 
   // Scale
   JS::RootedValue scale(cx);
-  if (!JS_GetProperty(cx, opts, "scale", &scale) || scale.isNullOrUndefined()) {
+  if (!JS_GetProperty(cx, opts, "scale", &scale) || scale.isNullOrUndefined() || !scale.isObject()) {
     scale = JS::RootedValue(cx,
       JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f(1, 1, 1))));
-  }
-  if (!EnsureJSObject(cx, &scale)) {
-    delete model;
-    return false;
   }
   model->scaleVal = new JS::Heap<JS::Value>(scale);
 
   // CollideTag (defaults to "default")
   JS::RootedValue collideTag(cx);
-  if (!JS_GetProperty(cx, opts, "collideTag", &collideTag) || collideTag.isNullOrUndefined()) {
+  if (!JS_GetProperty(cx, opts, "collideTag", &collideTag) || collideTag.isNullOrUndefined() || !collideTag.isString()) {
     collideTag.setString(JS_NewStringCopyZ(cx, "default"));
   }
   model->collideTagVal = new JS::Heap<JS::Value>(collideTag);
 
   // CollidesWith
   JS::RootedValue collidesWith(cx);
-  if (!JS_GetProperty(cx, opts, "collidesWith", &collidesWith) || collidesWith.isNullOrUndefined()) {
+  if (!JS_GetProperty(cx, opts, "collidesWith", &collidesWith) || collidesWith.isNullOrUndefined() || !collidesWith.isObject()) {
     JSObject* obj = JS_NewPlainObject(cx);
     collidesWith.setObject(*obj);
   }
@@ -721,7 +855,7 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 
   // Uniforms
   JS::RootedValue uniforms(cx);
-  if (!JS_GetProperty(cx, opts, "uniforms", &uniforms) || uniforms.isNullOrUndefined()) {
+  if (!JS_GetProperty(cx, opts, "uniforms", &uniforms) || uniforms.isNullOrUndefined() || !uniforms.isObject()) {
     JSObject* obj = JS_NewPlainObject(cx);
     uniforms.setObject(*obj);
   }
@@ -757,6 +891,9 @@ void CoreModel_trace(JSTracer *tracer, JSObject *obj) {
   JS_CallValueTracer(tracer, model->positionVal, "positionVal");
   JS_CallValueTracer(tracer, model->rotationVal, "rotationVal");
   JS_CallValueTracer(tracer, model->scaleVal, "scaleVal");
+  JS_CallValueTracer(tracer, model->textureVal, "textureVal");
+  JS_CallValueTracer(tracer, model->textVal, "textVal");
+  JS_CallValueTracer(tracer, model->textColorVal, "textColorVal");
   JS_CallValueTracer(tracer, model->collideTagVal, "collideTagVal");
   JS_CallValueTracer(tracer, model->collidesWithVal, "collidesWithVal");
   JS_CallValueTracer(tracer, model->uniformsVal, "uniformsVal");
@@ -878,8 +1015,4 @@ JSObject* NewCoreModel(JSContext* cx, CoreModel* model) {
 CoreModel* GetCoreModel(JS::HandleObject obj) {
   CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
   return model;
-}
-
-bool CallbackDefined(JS::Heap<JS::Value>* val) {
-  return val != NULL && !val->isNullOrUndefined();
 }
