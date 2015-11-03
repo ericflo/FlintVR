@@ -39,7 +39,7 @@ function vrmain(env) {
     'out highp vec2 oTexCoord;\n'+
     'void main()\n'+
     '{\n'+
-    ' gl_Position = Projectionm * ( Viewm * ( Modelm * vec4( Position, 1.0 ) ) );\n'+
+    ' gl_Position = Projectionm * (Viewm * (Modelm * vec4(Position, 1.0)));\n'+
     ' fragmentColor = VertexColor;\n'+
     ' oTexCoord = TexCoord;\n'+
     '}'

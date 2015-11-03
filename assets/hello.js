@@ -29,7 +29,7 @@ function vrmain(env) {
     'out vec4 fragmentColor;\n'+
     'void main()\n'+
     '{\n'+
-    ' gl_Position = Projectionm * ( Viewm * ( Modelm * vec4( Position, 1.0 ) ) );\n'+
+    ' gl_Position = Projectionm * (Viewm * (Modelm * vec4(Position, 1.0)));\n'+
     ' fragmentColor = VertexColor;\n'+
     '}'
   ), (
@@ -176,7 +176,7 @@ function vrmain(env) {
     'uniform mat4 Projectionm;\n'+
     'void main()\n'+
     '{\n'+
-    ' gl_Position = Projectionm * ( Viewm * ( Modelm * vec4( Position, 1.0 ) ) );\n'+
+    ' gl_Position = Projectionm * (Viewm * (Modelm * vec4(Position, 1.0)));\n'+
     '}'
   ), (
     '#version 300 es\n'+
