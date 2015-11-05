@@ -17,6 +17,8 @@ CoreModel::CoreModel(void) :
   textureVal = NULL;
   textVal = NULL;
   textColorVal = NULL;
+  collideTagVal = NULL;
+  collidesWithVal = NULL;
 }
 
 CoreModel::~CoreModel(void) {
@@ -453,7 +455,7 @@ btTransform CoreModel::GetTransform() {
 }
 
 void CoreModel::StartCollisions(JSContext* cx) {
-  if (ValueDefined(geometryVal)) {
+  if (ValueDefined(geometryVal) && ValueDefined(collideTagVal)) {
     if (collisionShape != NULL) {
       delete collisionShape;
       collisionShape = NULL;
@@ -534,7 +536,7 @@ void CoreModel::UpdateCollisionObjects(JSContext* cx) {
 }
 
 bool CoreModel::CheckCollision(JSContext* cx, CoreModel* otherModel) {
-  if (collideTagVal == NULL || otherModel->collidesWithVal == NULL) {
+  if (!ValueDefined(collideTagVal) || !ValueDefined(otherModel->collidesWithVal)) {
     return false;
   }
 
@@ -838,12 +840,11 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   }
   model->scaleVal = new JS::Heap<JS::Value>(scale);
 
-  // CollideTag (defaults to "default")
+  // CollideTag
   JS::RootedValue collideTag(cx);
-  if (!JS_GetProperty(cx, opts, "collideTag", &collideTag) || collideTag.isNullOrUndefined() || !collideTag.isString()) {
-    collideTag.setString(JS_NewStringCopyZ(cx, "default"));
+  if (JS_GetProperty(cx, opts, "collideTag", &collideTag) && !collideTag.isNullOrUndefined() && collideTag.isString()) {
+    model->collideTagVal = new JS::Heap<JS::Value>(collideTag);
   }
-  model->collideTagVal = new JS::Heap<JS::Value>(collideTag);
 
   // CollidesWith
   JS::RootedValue collidesWith(cx);

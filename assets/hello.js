@@ -86,9 +86,6 @@ function vrmain(env) {
   var starfield = Model({
     geometry: geometry,
     program: program,
-    position: Vector3f(0, 0, 0),
-    rotation: Vector3f(0, 0, 0),
-    scale: Vector3f(1, 1, 1)
   });
   env.scene.add(starfield);
 
@@ -189,8 +186,6 @@ function vrmain(env) {
   var cursor = Model({
     geometry: cubeGeometry,
     program: darkProgram,
-    position: Vector3f(0, 0, 0),
-    rotation: Vector3f(0, 0, 0),
     scale: Vector3f(0.02, 0.02, 0.02),
     onFrame: function(ev) {
       var pos = ev.viewPos.add(ev.viewFwd.multiply(5));

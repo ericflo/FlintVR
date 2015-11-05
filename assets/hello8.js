@@ -20,7 +20,7 @@ var ACTION_START_GAME = 2;
 var ACTION_CANCEL_GAME = 3;
 var ACTION_SPAWN_ENEMY = 4;
 
-var state = {
+var STATE = {
   screen:  SCREEN_MENU,
   level:   1,
   start:   0,
@@ -33,22 +33,22 @@ var state = {
 
 function handleFrame(now) {
   // Update time counters
-  if (state.start === 0) {
-    state.start = now;
+  if (STATE.start === 0) {
+    STATE.start = now;
   }
-  state.elapsed = now - state.start;
+  STATE.elapsed = now - STATE.start;
 
   // Perform any time based actions
-  if (state.screen === SCREEN_GAME &&         // If we're playing the game
-      state.level === 1 &&                    // And we're on level 1
-      60 * state.spawned <= state.elapsed &&  // Then every 60 seconds
-      state.spawned <= 20) {                  // Unless we've already spawned 20
+  if (STATE.screen === SCREEN_GAME &&         // If we're playing the game
+      STATE.level === 1 &&                    // And we're on level 1
+      1.5 * STATE.spawned <= STATE.elapsed && // Then every 1.5 seconds
+      STATE.spawned <= 20) {                  // Unless we've already spawned 20
     handleAction(ACTION_SPAWN_ENEMY);  // Spawn an enemy
   }
 
   // Update positions
-  for (var i = 0; i < state.enemies.length; ++i) {
-    state.enemies[i].update(i, state.elapsed);
+  for (var i = 0; i < STATE.enemies.length; i++) {
+    STATE.enemies[i].update(i, STATE.elapsed);
   }
 }
 
@@ -58,23 +58,23 @@ function handleAction(act, data) {
     handleFrame(data);
     break;
   case ACTION_START_GAME:
-    state.screen = SCREEN_GAME;
-    state.level = 1;
-    state.spawned = 0;
-    env.scene.remove(state.menu.model);
-    env.scene.add(state.game.model);
+    STATE.screen = SCREEN_GAME;
+    STATE.level = 1;
+    STATE.spawned = 0;
+    env.scene.remove(STATE.menu.model);
+    env.scene.add(STATE.game.model);
     break;
   case ACTION_CANCEL_GAME:
-    state.screen = SCREEN_MENU;
-    state.level = 1;
-    env.scene.remove(state.game.model);
-    env.scene.add(state.menu.model);
+    STATE.screen = SCREEN_MENU;
+    STATE.level = 1;
+    env.scene.remove(STATE.game.model);
+    env.scene.add(STATE.menu.model);
     break;
   case ACTION_SPAWN_ENEMY:
-    var enemy = Enemy();
-    state.spawned += 1;
-    state.enemies.push(enemy);
-    state.game.add(enemy.model);
+    var enemy = new Enemy();
+    STATE.spawned += 1;
+    STATE.enemies.push(enemy);
+    STATE.game.model.add(enemy.model);
     break;
   }
 }
@@ -135,22 +135,22 @@ function Box(size) {
 function Enemy() {
   this.model = Model({
     geometry: new Box(),
-    position: Vector3f(0, 0, -20),
+    position: Vector3f(0, 0, 999),
     program: colorProgram,
     uniforms: {color: Vector4f(1, 0, 0, 1)},
   });
 }
 
 Enemy.prototype.update = function(idx, elapsed) {
-  this.position.x = (idx * 10) - 60;
-  this.position.z = elapsed - 100;
+  this.model.position.x = (idx * 10) - 60;
+  this.model.position.z = elapsed - 100;
 };
 
 //
 
 function Menu() {
   this.model = Model({
-    position: Vector3f(0, 0, -8),
+    position: Vector3f(-6, 0, -8),
     text: 'Start Game',
     textColor: Vector4f(0.1, 0.1, 0.1, 1),
     textSize: 12,
@@ -176,6 +176,6 @@ function Game() {
   });
 }
 
-env.scene.add(state.menu.model);
+env.scene.add(STATE.menu.model);
 
 }

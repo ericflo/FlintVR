@@ -71,7 +71,7 @@ function vrmain(env) {
   var cube = Model({
     geometry: cubeGeometry,
     program: program,
-    texture: texture,
+    textures: [texture],
     position: Vector3f(0, 0, -10),
     onFrame: function(ev) {
       if (!this._start) {
