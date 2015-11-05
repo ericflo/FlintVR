@@ -18,7 +18,13 @@ CoreModel::CoreModel(void) :
   textVal = NULL;
   textColorVal = NULL;
   collideTagVal = NULL;
+  matrixVal = NULL;
+  positionVal = NULL;
+  rotationVal = NULL;
+  scaleVal = NULL;
   collidesWithVal = NULL;
+  uniformsVal = NULL;
+  fileVal = NULL;
 }
 
 CoreModel::~CoreModel(void) {
@@ -26,6 +32,7 @@ CoreModel::~CoreModel(void) {
   delete geometryVal;
   delete programVal;
   delete texturesVal;
+  delete fileVal;
   delete textVal;
   delete textColorVal;
   delete matrixVal;
@@ -45,6 +52,42 @@ CoreModel::~CoreModel(void) {
   delete onCollideEndVal;
   StopCollisions();
 }
+
+void CoreModel::AddModel(JSContext* cx, JS::HandleObject otherModelObj) {
+  CoreModel* otherModel = GetCoreModel(otherModelObj);
+
+  // TODO: Is this correct? Propagate the program from the parent?
+  if (!ValueDefined(otherModel->programVal)) {
+    JS::RootedValue prog(cx, *programVal);
+    otherModel->programVal = new JS::Heap<JS::Value>(prog);
+  }
+
+  // Annotate the scene object on the model
+  otherModel->scene = scene;
+
+  // Make sure collision detection is set up and configured
+  otherModel->StartCollisions(cx);
+
+  JS::RootedValue otherModelVal(cx, JS::ObjectOrNullValue(otherModelObj));
+  children.PushBack(JS::Heap<JS::Value>(otherModelVal));
+}
+
+static JSClass coreModelClass = {
+  "Model",               /* name */
+  JSCLASS_HAS_PRIVATE,   /* flags */
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  CoreModel_finalize,
+  NULL,
+  NULL,
+  NULL,
+  CoreModel_trace
+};
 
 bool CoreModel::RemoveModel(JSContext* cx, CoreModel* model) {
   // Find the index of the model to remove
@@ -80,7 +123,7 @@ void CoreModel::ComputeMatrices(JSContext* cx, OVR::Matrix4f& transform) {
   OVR::Matrix4f mtx;
 
   OVR::Matrix4f* mat = matrix(cx);
-  if (mat == NULL) {
+  if (mat != NULL) {
     mtx = *mat;
   }
 
@@ -663,22 +706,227 @@ CoreModel* CoreModel::ModelById(JSContext* cx, int otherId) {
   return NULL;
 }
 
-static JSClass coreModelClass = {
-  "Model",               /* name */
-  JSCLASS_HAS_PRIVATE,   /* flags */
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  CoreModel_finalize,
-  NULL,
-  NULL,
-  NULL,
-  CoreModel_trace
-};
+bool CoreModel::LoadFile(JSContext* cx) {
+  // Make sure there's a file to load
+  if (!ValueDefined(fileVal)) {
+    __android_log_print(ANDROID_LOG_WARN, LOG_COMPONENT, "Tried to load undefined model file\n");
+    return true;
+  }
+
+  // Get the string
+  JS::RootedValue file(cx, *fileVal);
+  OVR::String fileStr;
+  if (!GetOVRStringVal(cx, file, &fileStr)) {
+    JS_ReportError(cx, "Could not get file string from file variable");
+    return false;
+  }
+
+  // Load it into a mem buffer
+  OVR::MemBufferFile buf(OVR::MemBufferFile::NoInit);
+  if (!OVR::ovr_ReadFileFromApplicationPackage(fileStr.ToCStr(), buf)) {
+    JS_ReportError(cx, "Could not load model file %s", fileStr.ToCStr());
+    return false;
+  }
+
+  // Load the model file in the memory buffer via Assimp
+  Assimp::Importer importer;
+  const aiScene* scn = importer.ReadFileFromMemory(buf.Buffer, buf.Length,
+    aiProcessPreset_TargetRealtime_MaxQuality);
+
+  // Build a map of all textures
+  OVR::Hash<OVR::String, OVR::GlTexture> textureMap;
+  OVR::Hash<OVR::String, int> textureWidths;
+  OVR::Hash<OVR::String, int> textureHeights;
+  aiString path;
+  for (unsigned int materialNum = 0; materialNum < scn->mNumMaterials; ++materialNum) {
+    aiMaterial* material = scn->mMaterials[materialNum];
+    int textureCount = material->GetTextureCount(aiTextureType_DIFFUSE);
+    for (int textureNum = 0; textureNum < textureCount; ++textureNum) {
+      if (AI_SUCCESS != material->GetTexture(aiTextureType_DIFFUSE, textureNum, &path)) {
+        continue;
+      }
+
+      OVR::String pathStr(path.data, path.length);
+      if (pathStr.GetCharAt(0) != '*') {
+        continue;
+      }
+
+      OVR::String sub = pathStr.Substring(1, pathStr.GetLength());
+      unsigned int textureIdx = atoi(sub.ToCStr());
+      aiTexture* texture = scn->mTextures[textureIdx];
+
+      OVR::GlTexture tex;
+      if (texture->mHeight == 0) {
+        OVR::String fakeFilename;
+        if (texture->achFormatHint[0] == '\0') {
+          fakeFilename = OVR::String("fakefallback.jpg");
+        } else {
+          fakeFilename = OVR::String::Format("fake.%s", texture->achFormatHint);
+        }
+        OVR::MemBuffer texBuf(texture->pcData, texture->mWidth);
+        int width;
+        int height;
+        tex = OVR::LoadTextureFromBuffer(fakeFilename.ToCStr(), texBuf, OVR::TextureFlags_t(OVR::TEXTUREFLAG_NO_DEFAULT), width, height);
+        textureWidths.Set(pathStr, width);
+        textureHeights.Set(pathStr, height);
+      } else {
+        tex = OVR::LoadRGBATextureFromMemory((const unsigned char*)texture->pcData, texture->mWidth, texture->mHeight, true);
+        textureWidths.Set(pathStr, texture->mWidth);
+        textureHeights.Set(pathStr, texture->mHeight);
+      }
+      textureMap.Set(pathStr, tex);
+    }
+  }
+
+  // Each mesh gets its own model, to be added as a submodel to this one
+  for (unsigned int meshNum = 0; meshNum < scn->mNumMeshes; ++meshNum) {
+    aiMesh* mesh = scn->mMeshes[meshNum];
+
+    // Build up our vertex attributes
+    OVR::VertexAttribs* vertices = new OVR::VertexAttribs();
+
+    vertices->position.Resize(mesh->mNumVertices);
+    vertices->normal.Resize(mesh->mNumVertices);
+    vertices->tangent.Resize(mesh->mNumVertices);
+    vertices->binormal.Resize(mesh->mNumVertices);
+    vertices->color.Resize(mesh->mNumVertices);
+    if (mesh->GetNumUVChannels() > 0) {
+      vertices->uv0.Resize(mesh->mNumVertices);
+    }
+    if (mesh->GetNumUVChannels() > 1) {
+      vertices->uv1.Resize(mesh->mNumVertices);
+    }
+    // TODO: Joint indices & weights
+
+    for (unsigned int vertexNum = 0; vertexNum < mesh->mNumVertices; ++vertexNum) {
+      aiVector3D vertex = mesh->mVertices[vertexNum];
+      vertices->position.PushBack(OVR::Vector3f(vertex.x, vertex.y, vertex.z));
+
+      aiVector3D normal = mesh->mNormals[vertexNum];
+      vertices->normal.PushBack(OVR::Vector3f(normal.x, normal.y, normal.z));
+
+      aiVector3D tangent = mesh->mTangents[vertexNum];
+      vertices->tangent.PushBack(OVR::Vector3f(tangent.x, tangent.y, tangent.z));
+
+      aiVector3D binormal = mesh->mBitangents[vertexNum];
+      vertices->binormal.PushBack(OVR::Vector3f(binormal.x, binormal.y, binormal.z));
+      
+      if (mesh->GetNumColorChannels() > 0) {
+        aiColor4D* color = mesh->mColors[vertexNum];
+        vertices->color.PushBack(OVR::Vector4f(color[0].r, color[0].g, color[0].b, color[0].a));
+      }
+      if (mesh->GetNumColorChannels() > 1) {
+        __android_log_print(ANDROID_LOG_WARN, LOG_COMPONENT, "Discarding extra color channels\n");
+      }
+
+      // TODO: Figure out how to not throw away a whole dimension for these UVs
+      if (mesh->GetNumUVChannels() > 0) {
+        aiVector3D uv = mesh->mTextureCoords[0][vertexNum];
+        vertices->uv0.PushBack(OVR::Vector2f(uv.x, uv.y));
+      }
+      if (mesh->GetNumUVChannels() > 1) {
+        aiVector3D uv = mesh->mTextureCoords[1][vertexNum];
+        vertices->uv0.PushBack(OVR::Vector2f(uv.x, uv.y));
+      }
+      if (mesh->GetNumUVChannels() > 2) {
+        __android_log_print(ANDROID_LOG_WARN, LOG_COMPONENT, "Discarding extra UV channels\n");
+      }
+    }
+
+    // Build up our geometry indices
+    OVR::Array<OVR::TriangleIndex> indices;
+    indices.Resize(mesh->mNumFaces * 3);
+    for (unsigned int faceNum = 0; faceNum < mesh->mNumFaces; ++faceNum) {
+      aiFace face = mesh->mFaces[faceNum];
+      for (unsigned int indexNum = 0; indexNum < face.mNumIndices; ++indexNum) {
+        unsigned int index = face.mIndices[indexNum];
+        indices.PushBack(index);
+      }
+    }
+
+    // Create CoreTexture array
+    JS::RootedObject textureArray(cx, JS_NewArrayObject(cx, 0));
+    int textureArrayCount = 0;
+    aiMaterial* material = scn->mMaterials[mesh->mMaterialIndex];
+    int textureCount = material->GetTextureCount(aiTextureType_DIFFUSE);
+    aiString texturePath;
+    for (int i = 0; i < textureCount; ++i) {
+      if (material->GetTexture(aiTextureType_DIFFUSE, i, &texturePath) == AI_SUCCESS) {
+        OVR::String texturePathStr(texturePath.data, texturePath.length);
+        OVR::GlTexture tex = *(textureMap.Get(texturePathStr));
+        int width = *(textureWidths.Get(texturePathStr));
+        int height = *(textureHeights.Get(texturePathStr));
+        CoreTexture* coreTex = new CoreTexture(tex, width, height);
+        JS::RootedObject coreTexObj(cx, NewCoreTexture(cx, coreTex));
+        JS::RootedValue coreTexVal(cx, JS::ObjectOrNullValue(coreTexObj));
+        if (!JS_SetElement(cx, textureArray, textureArrayCount, coreTexVal)) {
+          JS_ReportError(cx, "Could not place texture in textures array");
+          delete vertices;
+          return false;
+        }
+        textureArrayCount++;
+      }
+    }
+
+    CoreModel* model = new CoreModel();
+    
+    // Add the model's geometry
+    JS::RootedValue geometry(cx, JS::ObjectOrNullValue(
+      NewCoreGeometry(cx, new CoreGeometry(vertices, indices))));
+    model->geometryVal = new JS::Heap<JS::Value>(geometry);
+
+    // Add the model's textures
+    if (textureArrayCount > 0) {
+      model->texturesVal = new JS::Heap<JS::Value>(JS::ObjectOrNullValue(textureArray));
+    }
+
+    // Fill any defaults we haven't filled in (all of them)
+    model->FillDefaults(cx);
+
+    JS::RootedObject submodel(cx, NewCoreModel(cx, model));
+    AddModel(cx, submodel);
+  }
+
+  return true;
+}
+
+void CoreModel::FillDefaults(JSContext* cx) {
+  if (matrixVal == NULL) {
+    JS::RootedValue matrix(cx, JS::ObjectOrNullValue(
+      NewCoreMatrix4f(cx, new OVR::Matrix4f())));
+    matrixVal = new JS::Heap<JS::Value>(matrix);
+  }
+
+  if (positionVal == NULL) {
+    JS::RootedValue position(cx, JS::ObjectOrNullValue(
+      NewCoreVector3f(cx, new OVR::Vector3f())));
+    positionVal = new JS::Heap<JS::Value>(position);
+  }
+  
+  if (rotationVal == NULL) {
+    JS::RootedValue rotation(cx, JS::ObjectOrNullValue(
+      NewCoreVector3f(cx, new OVR::Vector3f())));
+    rotationVal = new JS::Heap<JS::Value>(rotation);
+  }
+
+  if (scaleVal == NULL) {
+    JS::RootedValue scale(cx, JS::ObjectOrNullValue(
+      NewCoreVector3f(cx, new OVR::Vector3f(1, 1, 1))));
+    scaleVal = new JS::Heap<JS::Value>(scale);
+  }
+
+  if (collidesWithVal == NULL) {
+    JS::RootedValue collidesWith(cx, JS::ObjectOrNullValue(
+      JS_NewPlainObject(cx)));
+    collidesWithVal = new JS::Heap<JS::Value>(collidesWith);
+  }
+
+  if (uniformsVal == NULL) {
+    JS::RootedValue uniforms(cx, JS::ObjectOrNullValue(
+      JS_NewPlainObject(cx)));
+    uniformsVal = new JS::Heap<JS::Value>(uniforms);
+  }
+}
 
 VRJS_GETSET(CoreModel, geometry)
 VRJS_GETSET(CoreModel, program)
@@ -687,6 +935,7 @@ VRJS_GETSET(CoreModel, position)
 VRJS_GETSET(CoreModel, rotation)
 VRJS_GETSET(CoreModel, scale)
 VRJS_GETSET(CoreModel, textures)
+VRJS_GETSET_POST(CoreModel, file, item->LoadFile(cx))
 VRJS_GETSET(CoreModel, text)
 VRJS_GETSET(CoreModel, textColor)
 VRJS_GETSET(CoreModel, collideTag)
@@ -749,6 +998,7 @@ static JSPropertySpec CoreModel_props[] = {
   VRJS_PROP(CoreModel, rotation),
   VRJS_PROP(CoreModel, scale),
   VRJS_PROP(CoreModel, textures),
+  VRJS_PROP(CoreModel, file),
   VRJS_PROP(CoreModel, text),
   VRJS_PROP(CoreModel, textColor),
   VRJS_PROP(CoreModel, textSize),
@@ -816,6 +1066,15 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     model->texturesVal = new JS::Heap<JS::Value>(textures);
   }
 
+  // File
+  JS::RootedValue fileVal(cx);
+  if (JS_GetProperty(cx, opts, "file", &fileVal) && !fileVal.isNullOrUndefined() && fileVal.isString()) {
+    model->fileVal = new JS::Heap<JS::Value>(fileVal);
+    if (!model->LoadFile(cx)) {
+      return false;
+    }
+  }
+
   // Text
   JS::RootedValue text(cx);
   if (JS_GetProperty(cx, opts, "text", &text) && !text.isNullOrUndefined() && text.isString()) {
@@ -842,35 +1101,27 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 
   // Base transform matrix
   JS::RootedValue matrix(cx);
-  if (JS_GetProperty(cx, opts, "transform", &matrix) || matrix.isNullOrUndefined() || !matrix.isObject()) {
-    matrix = JS::RootedValue(cx,
-      JS::ObjectOrNullValue(NewCoreMatrix4f(cx, new OVR::Matrix4f())));
+  if (JS_GetProperty(cx, opts, "transform", &matrix) && !matrix.isNullOrUndefined() && matrix.isObject()) {
+    model->matrixVal = new JS::Heap<JS::Value>(matrix);
   }
-  model->matrixVal = new JS::Heap<JS::Value>(matrix);
 
   // Position
   JS::RootedValue position(cx);
-  if (!JS_GetProperty(cx, opts, "position", &position) || position.isNullOrUndefined() || !position.isObject()) {
-    position = JS::RootedValue(cx,
-      JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f())));
+  if (JS_GetProperty(cx, opts, "position", &position) && !position.isNullOrUndefined() && position.isObject()) {
+    model->positionVal = new JS::Heap<JS::Value>(position);
   }
-  model->positionVal = new JS::Heap<JS::Value>(position);
 
   // Rotation
   JS::RootedValue rotation(cx);
-  if (!JS_GetProperty(cx, opts, "rotation", &rotation) || rotation.isNullOrUndefined() || !rotation.isObject()) {
-    rotation = JS::RootedValue(cx,
-      JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f())));
+  if (JS_GetProperty(cx, opts, "rotation", &rotation) && !rotation.isNullOrUndefined() && rotation.isObject()) {
+    model->rotationVal = new JS::Heap<JS::Value>(rotation);
   }
-  model->rotationVal = new JS::Heap<JS::Value>(rotation);
 
   // Scale
   JS::RootedValue scale(cx);
-  if (!JS_GetProperty(cx, opts, "scale", &scale) || scale.isNullOrUndefined() || !scale.isObject()) {
-    scale = JS::RootedValue(cx,
-      JS::ObjectOrNullValue(NewCoreVector3f(cx, new OVR::Vector3f(1, 1, 1))));
+  if (JS_GetProperty(cx, opts, "scale", &scale) && !scale.isNullOrUndefined() && scale.isObject()) {
+    model->scaleVal = new JS::Heap<JS::Value>(scale);
   }
-  model->scaleVal = new JS::Heap<JS::Value>(scale);
 
   // CollideTag
   JS::RootedValue collideTag(cx);
@@ -880,19 +1131,15 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
 
   // CollidesWith
   JS::RootedValue collidesWith(cx);
-  if (!JS_GetProperty(cx, opts, "collidesWith", &collidesWith) || collidesWith.isNullOrUndefined() || !collidesWith.isObject()) {
-    JSObject* obj = JS_NewPlainObject(cx);
-    collidesWith.setObject(*obj);
+  if (JS_GetProperty(cx, opts, "collidesWith", &collidesWith) && !collidesWith.isNullOrUndefined() && collidesWith.isObject()) {
+    model->collidesWithVal = new JS::Heap<JS::Value>(collidesWith);
   }
-  model->collidesWithVal = new JS::Heap<JS::Value>(collidesWith);
 
   // Uniforms
   JS::RootedValue uniforms(cx);
-  if (!JS_GetProperty(cx, opts, "uniforms", &uniforms) || uniforms.isNullOrUndefined() || !uniforms.isObject()) {
-    JSObject* obj = JS_NewPlainObject(cx);
-    uniforms.setObject(*obj);
+  if (JS_GetProperty(cx, opts, "uniforms", &uniforms) && !uniforms.isNullOrUndefined() && uniforms.isObject()) {
+    model->uniformsVal = new JS::Heap<JS::Value>(uniforms);
   }
-  model->uniformsVal = new JS::Heap<JS::Value>(uniforms);
 
   // Callbacks
   SetMaybeCallback(cx, &opts, "onFrame", &model->onFrameVal);
@@ -903,6 +1150,8 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   SetMaybeCallback(cx, &opts, "onGestureTouchCancel", &model->onGestureTouchCancelVal);
   SetMaybeCallback(cx, &opts, "onCollideStart", &model->onCollideStartVal);
   SetMaybeCallback(cx, &opts, "onCollideEnd", &model->onCollideEndVal);
+
+  model->FillDefaults(cx);
 
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));
@@ -915,35 +1164,38 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
   delete model;
 }
 
-void CoreModel_trace(JSTracer *tracer, JSObject *obj) {
+void CoreModel_trace(JSTracer* tracer, JSObject* obj) {
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing model\n");
   CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing model id: %d\n", model->id);
-  JS_CallValueTracer(tracer, model->geometryVal, "geometryVal");
-  JS_CallValueTracer(tracer, model->programVal, "programVal");
-  JS_CallValueTracer(tracer, model->matrixVal, "matrixVal");
-  JS_CallValueTracer(tracer, model->positionVal, "positionVal");
-  JS_CallValueTracer(tracer, model->rotationVal, "rotationVal");
-  JS_CallValueTracer(tracer, model->scaleVal, "scaleVal");
-  JS_CallValueTracer(tracer, model->texturesVal, "texturesVal");
-  JS_CallValueTracer(tracer, model->textVal, "textVal");
-  JS_CallValueTracer(tracer, model->textColorVal, "textColorVal");
-  JS_CallValueTracer(tracer, model->collideTagVal, "collideTagVal");
-  JS_CallValueTracer(tracer, model->collidesWithVal, "collidesWithVal");
-  JS_CallValueTracer(tracer, model->uniformsVal, "uniformsVal");
-  JS_CallValueTracer(tracer, model->onFrameVal, "onFrameVal");
-  JS_CallValueTracer(tracer, model->onGazeHoverOverVal, "onGazeHoverOverVal");
-  JS_CallValueTracer(tracer, model->onGazeHoverOutVal, "onGazeHoverOutVal");
-  JS_CallValueTracer(tracer, model->onGestureTouchDownVal, "onGestureTouchDownVal");
-  JS_CallValueTracer(tracer, model->onGestureTouchUpVal, "onGestureTouchUpVal");
-  JS_CallValueTracer(tracer, model->onGestureTouchCancelVal, "onGestureTouchCancelVal");
-  JS_CallValueTracer(tracer, model->onCollideStartVal, "onCollideStartVal");
-  JS_CallValueTracer(tracer, model->onCollideEndVal, "onCollideEndVal");
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing model id: %d\n", model->id);
-  for (int i = 0; i < model->children.GetSizeI(); ++i) {
-    char buffer[50];
-    sprintf(buffer, "child%d", i);
-    JS_CallValueTracer(tracer, &model->children[i], buffer);
+  if (model != NULL) {
+    TraceHeap(tracer, model->geometryVal, "model", "geometryVal");
+    TraceHeap(tracer, model->programVal, "model", "programVal");
+    TraceHeap(tracer, model->matrixVal, "model", "matrixVal");
+    TraceHeap(tracer, model->positionVal, "model", "positionVal");
+    TraceHeap(tracer, model->rotationVal, "model", "rotationVal");
+    TraceHeap(tracer, model->scaleVal, "model", "scaleVal");
+    TraceHeap(tracer, model->texturesVal, "model", "texturesVal");
+    TraceHeap(tracer, model->fileVal, "model", "fileVal");
+    TraceHeap(tracer, model->textVal, "model", "textVal");
+    TraceHeap(tracer, model->textColorVal, "model", "textColorVal");
+    TraceHeap(tracer, model->collideTagVal, "model", "collideTagVal");
+    TraceHeap(tracer, model->collidesWithVal, "model", "collidesWithVal");
+    TraceHeap(tracer, model->uniformsVal, "model", "uniformsVal");
+    TraceHeap(tracer, model->onFrameVal, "model", "onFrameVal");
+    TraceHeap(tracer, model->onGazeHoverOverVal, "model", "onGazeHoverOverVal");
+    TraceHeap(tracer, model->onGazeHoverOutVal, "model", "onGazeHoverOutVal");
+    TraceHeap(tracer, model->onGestureTouchDownVal, "model", "onGestureTouchDownVal");
+    TraceHeap(tracer, model->onGestureTouchUpVal, "model", "onGestureTouchUpVal");
+    TraceHeap(tracer, model->onGestureTouchCancelVal, "model", "onGestureTouchCancelVal");
+    TraceHeap(tracer, model->onCollideStartVal, "model", "onCollideStartVal");
+    TraceHeap(tracer, model->onCollideEndVal, "model", "onCollideEndVal");
+    for (int i = 0; i < model->children.GetSizeI(); ++i) {
+      char buffer[50];
+      sprintf(buffer, "child%d", i);
+      TraceHeap(tracer, &model->children[i], "model", buffer);
+    }
   }
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing model\n");
 }
 
 bool CoreModel_add(JSContext* cx, unsigned argc, JS::Value *vp) {
@@ -960,19 +1212,12 @@ bool CoreModel_add(JSContext* cx, unsigned argc, JS::Value *vp) {
   }
 
   JS::RootedObject otherModelObj(cx, &args[0].toObject());
-  CoreModel* otherModel = GetCoreModel(otherModelObj);
 
   // Read the model object in
   JS::RootedObject thisObj(cx, &args.thisv().toObject());
   CoreModel* thisModel = GetCoreModel(thisObj);
 
-  // Annotate the scene object on the model
-  otherModel->scene = thisModel->scene;
-
-  // Make sure collision detection is set up and configured
-  otherModel->StartCollisions(cx);
-
-  thisModel->children.PushBack(JS::Heap<JS::Value>(args[0]));
+  thisModel->AddModel(cx, otherModelObj);
 
   return true;
 }

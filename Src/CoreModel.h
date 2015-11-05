@@ -49,6 +49,8 @@ public:
 
   JS::Heap<JS::Value>* texturesVal;
 
+  JS::Heap<JS::Value>* fileVal;
+
   // Text
   JS::Heap<JS::Value>* textVal;
   JS::Heap<JS::Value>* textColorVal;
@@ -84,6 +86,7 @@ public:
 
   CoreModel();
   ~CoreModel();
+  void AddModel(JSContext* cx, JS::HandleObject otherModelObj);
   bool RemoveModel(JSContext* cx, CoreModel* model);
   void ComputeMatrices(JSContext* cx, OVR::Matrix4f& transform);
   void CallFrameCallbacks(JSContext* cx, JS::HandleValue ev);
@@ -100,6 +103,8 @@ public:
   void CollidedWith(JSContext* cx, CoreModel* otherModel, JS::HandleValue ev);
   void FinishCollisions(JSContext* cx, JS::HandleValue ev);
   CoreModel* ModelById(JSContext* cx, int otherId);
+  bool LoadFile(JSContext* cx);
+  void FillDefaults(JSContext* cx);
 };
 
 void SetupCoreModel(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core);

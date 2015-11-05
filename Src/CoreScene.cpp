@@ -429,16 +429,16 @@ void CoreScene_finalize(JSFreeOp *fop, JSObject *obj) {
 void CoreScene_trace(JSTracer *tracer, JSObject *obj) {
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing scene\n");
   CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: got scene\n");
-  JS_CallValueTracer(tracer, scene->clearColorVal, "clearColorVal");
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: scene clearColorVal\n");
-  JS_CallValueTracer(tracer, scene->backgroundVal, "backgroundVal");
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Done tracing scene\n");
-  for (int i = 0; i < scene->children.GetSizeI(); ++i) {
-    char buffer[50];
-    sprintf(buffer, "child%d", i);
-    JS_CallValueTracer(tracer, &scene->children[i], buffer);
+  if (scene != NULL) {
+    TraceHeap(tracer, scene->clearColorVal, "scene", "clearColorVal");
+    TraceHeap(tracer, scene->backgroundVal, "scene", "backgroundVal");
+    for (int i = 0; i < scene->children.GetSizeI(); ++i) {
+      char buffer[50];
+      sprintf(buffer, "child%d", i);
+      TraceHeap(tracer, &scene->children[i], "scene", buffer);
+    }
   }
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Done tracing scene\n");
 }
 
 CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject* global, JS::RootedObject* core, JS::RootedObject* env) {

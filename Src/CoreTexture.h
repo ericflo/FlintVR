@@ -6,13 +6,14 @@
 
 class CoreTexture {
 public:
-  JS::Heap<JS::Value> path;
+  JS::Heap<JS::Value>* path;
   int width;
   int height;
   bool cube;
   OVR::GlTexture texture;
 
-  CoreTexture(JSContext* cx, JS::HandleValue _path, int _width, int _height, bool _cube = false);
+  CoreTexture(JSContext* cx, JS::Heap<JS::Value>* _path, int _width, int _height, bool _cube = false);
+  CoreTexture(OVR::GlTexture _tex, int _width, int _height);
   ~CoreTexture();
   bool Rebuild(JSContext* cx);
 private:

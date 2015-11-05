@@ -3,23 +3,40 @@
 
 CoreTexture::CoreTexture(
   JSContext* cx,
-  JS::HandleValue _path,
+  JS::Heap<JS::Value>* _path,
   int _width,
   int _height,
   bool _cube) :
-    path(_path),
     width(_width),
     height(_height),
     cube(_cube) {
+  path = _path;
   Rebuild(cx);
+}
+
+CoreTexture::CoreTexture(
+  OVR::GlTexture _tex,
+  int _width,
+  int _height) :
+    width(_width),
+    height(_height),
+    cube(false),
+    texture(_tex) {
+  path = NULL;
 }
 
 CoreTexture::~CoreTexture(void) {
   OVR::FreeTexture(texture);
-
+  delete path;
 }
 
 bool CoreTexture::RebuildCubemap(JSContext* cx, OVR::String pathStr) {
+  OVR::FreeTexture(texture);
+
+  if (pathStr.IsEmpty()) {
+    return true;
+  }
+
   // Get the file extension, and a copy of the path with no extension
   OVR::String ext = pathStr.GetExtension();
   OVR::String noExt(pathStr);
@@ -105,6 +122,12 @@ bool CoreTexture::RebuildCubemap(JSContext* cx, OVR::String pathStr) {
 }
 
 bool CoreTexture::RebuildTexture(JSContext* cx, OVR::String pathStr) {
+  OVR::FreeTexture(texture);
+
+  if (pathStr.IsEmpty()) {
+    return true;
+  }
+
   // Get it from the package for now
   // TODO: Pull from somewhere else?
   OVR::MemBufferFile bufferFile(OVR::MemBufferFile::NoInit);
@@ -136,7 +159,7 @@ bool CoreTexture::Rebuild(JSContext* cx) {
 
   // Get the path string
   OVR::String pathStr;
-  JS::RootedValue pathVal(cx, path);
+  JS::RootedValue pathVal(cx, *path);
   if (!GetOVRStringVal(cx, pathVal, &pathStr)) {
     return false;
   }
@@ -172,7 +195,7 @@ static bool CoreTexture_get_path(JSContext* cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   JS::RootedObject self(cx, &args.thisv().toObject());
   CoreTexture* item = GetCoreTexture(self);
-  JS::RootedValue val(cx, item->path);
+  JS::RootedValue val(cx, *item->path);
   args.rval().set(val);
   return true;
 }
@@ -185,7 +208,9 @@ static bool CoreTexture_set_path(JSContext* cx, unsigned argc, JS::Value* vp) {
   }
   JS::RootedObject self(cx, &args.thisv().toObject());
   CoreTexture* item = GetCoreTexture(self);
-  item->path = JS::Heap<JS::Value>(args[0]);
+  JS::Heap<JS::Value>* oldPath = item->path;
+  item->path = new JS::Heap<JS::Value>(args[0]);
+  delete oldPath;
   item->Rebuild(cx);
   return true;
 }
@@ -328,8 +353,9 @@ bool CoreTexture_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   }
 
   // Create our self object
-  CoreTexture* tex = new CoreTexture(cx, pathVal, widthVal.toInt32(),
-                                     heightVal.toInt32(), cubeVal.toBoolean());
+  CoreTexture* tex = new CoreTexture(cx, new JS::Heap<JS::Value>(pathVal),
+                                     widthVal.toInt32(), heightVal.toInt32(),
+                                     cubeVal.toBoolean());
   JS::RootedObject self(cx, NewCoreTexture(cx, tex));
 
   // Return our self object
@@ -346,7 +372,9 @@ void CoreTexture_finalize(JSFreeOp *fop, JSObject *obj) {
 void CoreTexture_trace(JSTracer *tracer, JSObject *obj) {
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing texture\n");
   CoreTexture* tex = (CoreTexture*)JS_GetPrivate(obj);
-  JS_CallValueTracer(tracer, &tex->path, "pathVal");
+  if (tex != NULL) {
+    TraceHeap(tracer, tex->path, "texture", "pathVal");
+  }
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing texture\n");
 }
 

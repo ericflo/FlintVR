@@ -56,5 +56,6 @@ void SetMaybeCallback(JSContext* cx, JS::RootedObject* opts, const char* name, J
 bool GetOVRStringVal(JSContext* cx, JS::HandleValue val, OVR::String* out);
 bool GetOVRString(JSContext* cx, JS::HandleString s, OVR::String* out);
 bool ValueDefined(JS::Heap<JS::Value>* val);
+void TraceHeap(JSTracer* tracer, JS::Heap<JS::Value>* val, const char* parentName, const char* name);
 
 #endif

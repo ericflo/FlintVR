@@ -14,6 +14,7 @@
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/Importer.hpp>
 
 inline int bullet_btInfinityMask(){ return btInfinityMask; } // Hack to work around bullet bug
 

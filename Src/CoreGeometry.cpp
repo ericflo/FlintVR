@@ -16,7 +16,28 @@ CoreGeometry::~CoreGeometry(void) {
 
 static JSClass coreGeometryClass = {
   "Geometry",             /* name */
-  JSCLASS_HAS_PRIVATE    /* flags */
+  JSCLASS_HAS_PRIVATE,    /* flags */
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  CoreGeometry_finalize,
+  NULL,
+  NULL,
+  NULL,
+  CoreGeometry_trace
+};
+
+//VRJS_GETSET(CoreGeometry, vertices)
+//VRJS_GETSET(CoreGeometry, indices)
+
+static JSPropertySpec CoreGeometry_props[] = {
+//  VRJS_PROP(CoreGeometry, vertices),
+//  VRJS_PROP(CoreGeometry, indices),
+  JS_PS_END
 };
 
 bool CoreGeometry_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
@@ -35,31 +56,36 @@ bool CoreGeometry_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   }
   JS::RootedObject opts(cx, &args[0].toObject());
 
-  // Get a reference to the VertexAttribs from the opts object
+  // Vertices
   JS::RootedValue vertices(cx);
-  if (!JS_GetProperty(cx, opts, "vertices", &vertices)) {
-    JS_ReportError(cx, "Could not find 'vertices' option");
+  if (!JS_GetProperty(cx, opts, "vertices", &vertices) || vertices.isNullOrUndefined() || !vertices.isObject()) {
+    JS_ReportError(cx, "Could not parse vertices");
+    return false;
+  }
+  bool isArray;
+  if (!JS_IsArrayObject(cx, vertices, &isArray) || !isArray) {
+    JS_ReportError(cx, "Expected vertices to be an array object");
     return false;
   }
 
-  // TODO: Validate object type before casting
+  // Indices
+  JS::RootedValue indices(cx);
+  if (!JS_GetProperty(cx, opts, "indices", &indices) || indices.isNullOrUndefined() || !indices.isObject()) {
+    JS_ReportError(cx, "Could not parse indices");
+    return false;
+  }
+  if (!JS_IsArrayObject(cx, indices, &isArray) || !isArray) {
+    JS_ReportError(cx, "Expected indices to be an array object");
+    return false;
+  }
+
   OVR::VertexAttribs* vert = ParseVertexAttribs(cx, vertices);
   if (vert == NULL) {
     // The parser reports the error
     return false;
   }
 
-  // Build up an array of triangle indices from the opts object
-  JS::RootedValue indices(cx);
-  if (!JS_GetProperty(cx, opts, "indices", &indices)) {
-    JS_ReportError(cx, "Could not find 'indices' option");
-    return false;
-  }
-  bool isArray;
-  if (!JS_IsArrayObject(cx, indices, &isArray) || !isArray) {
-    JS_ReportError(cx, "Expected indices to be an array object");
-    return false;
-  }
+  // Build the indices array
   JS::RootedObject indicesObj(cx, &indices.toObject());
   // Get the length of the index array
   uint32_t indexLength;
@@ -70,36 +96,18 @@ bool CoreGeometry_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   // Fill a TriangleIndex array with the ints
   OVR::Array<OVR::TriangleIndex> idc;
   idc.Resize(indexLength);
-  JS::RootedValue tmp(cx);
+  JS::RootedValue index(cx);
   for (size_t i = 0; i < indexLength; ++i) {
-    if (!JS_GetElement(cx, indicesObj, i, &tmp)) {
+    if (!JS_GetElement(cx, indicesObj, i, &index)) {
       JS_ReportError(cx, "Couldn't get index at slot %d", i);
       return false;
     }
-    idc[i] = tmp.toInt32();
-  }
-
-  // Go ahead and create our self object
-  JS::RootedObject self(cx, JS_NewObject(cx, &coreGeometryClass));
-  if (!JS_SetProperty(cx, self, "vertices", vertices)) {
-    JS_ReportError(cx, "Could not set vertices property on geometry object");
-    return false;
-  }
-  if (!JS_SetProperty(cx, self, "indices", indices)) {
-    JS_ReportError(cx, "Could not set indices property on geometry object");
-    return false;
+    idc[i] = index.toInt32();
   }
 
   // Now we create our geometry
   CoreGeometry* geometry = new CoreGeometry(vert, idc);
-
-  // Store the geometry in the private data area
-  JS_SetPrivate(self, (void *)geometry);
-
-  if (!JS_FreezeObject(cx, self)) {
-    JS_ReportError(cx, "Could not freeze geometry object");
-    return false;
-  }
+  JS::RootedObject self(cx, NewCoreGeometry(cx, geometry));
 
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));
@@ -112,9 +120,9 @@ void CoreGeometry_finalize(JSFreeOp *fop, JSObject *obj) {
   delete geometry;
 }
 
-CoreGeometry* GetCoreGeometry(JS::HandleObject obj) {
-  CoreGeometry* geometry = (CoreGeometry*)JS_GetPrivate(obj);
-  return geometry;
+void CoreGeometry_trace(JSTracer *tracer, JSObject *obj) {
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing geometry\n");
+  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing geometry\n");
 }
 
 void SetupCoreGeometry(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {
@@ -172,4 +180,18 @@ void SetupCoreGeometry(JSContext* cx, JS::RootedObject *global, JS::RootedObject
     __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core.VERTEX_JOINT_WEIGHTS constant\n");
     return;
   }
+}
+
+JSObject* NewCoreGeometry(JSContext* cx, CoreGeometry *geometry) {
+  JS::RootedObject self(cx, JS_NewObject(cx, &coreGeometryClass));
+  if (!JS_DefineProperties(cx, self, CoreGeometry_props)) {
+    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on geometry\n");
+  }
+  JS_SetPrivate(self, (void *)geometry);
+  return self;
+}
+
+CoreGeometry* GetCoreGeometry(JS::HandleObject obj) {
+  CoreGeometry* geometry = (CoreGeometry*)JS_GetPrivate(obj);
+  return geometry;
 }

@@ -95,9 +95,9 @@ bool CoreProgram_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   }
 
   CoreProgram* prog = new CoreProgram();
-  JS::RootedObject self(cx, NewCoreProgram(cx, prog));
   prog->vertexVal = new JS::Heap<JS::Value>(args[0]);
   prog->fragmentVal = new JS::Heap<JS::Value>(args[1]);
+  JS::RootedObject self(cx, NewCoreProgram(cx, prog));
   if (!prog->Rebuild(cx)) {
     JS_ReportError(cx, "Could not build program");
     delete prog;
@@ -118,10 +118,10 @@ void CoreProgram_finalize(JSFreeOp *fop, JSObject *obj) {
 void CoreProgram_trace(JSTracer *tracer, JSObject *obj) {
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing program\n");
   CoreProgram* program = (CoreProgram*)JS_GetPrivate(obj);
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: Got program\n");
-  JS_CallValueTracer(tracer, program->vertexVal, "vertexVal");
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: Program vertex\n");
-  JS_CallValueTracer(tracer, program->fragmentVal, "fragmentVal");
+  if (program != NULL) {
+    TraceHeap(tracer, program->vertexVal, "program", "vertexVal");
+    TraceHeap(tracer, program->fragmentVal, "program", "fragmentVal");
+  }
   __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing program\n");
 }
 

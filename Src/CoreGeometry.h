@@ -15,7 +15,9 @@ public:
 };
 
 void SetupCoreGeometry(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core);
-//JSObject* NewCoreGeometry(JSContext* cx, OVR::GlGeometry *geometry);
+JSObject* NewCoreGeometry(JSContext* cx, CoreGeometry* geometry);
 CoreGeometry* GetCoreGeometry(JS::HandleObject obj);
+void CoreGeometry_finalize(JSFreeOp *fop, JSObject *obj);
+void CoreGeometry_trace(JSTracer *tracer, JSObject *obj);
 
 #endif

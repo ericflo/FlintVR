@@ -78,7 +78,7 @@ function vrmain(env) {
       cube = Model({
         geometry: cubeGeometry,
         program: program,
-        position: Vector3f(0, 0, -10),
+        position: Vector3f(0, 0, -18),
         onFrame: function(ev) {
           if (!this._start) {
             this._start = ev.now;
