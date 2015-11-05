@@ -47,7 +47,7 @@ public:
   OVR::Vector3f* rotation(JSContext* cx);
   OVR::Vector3f* scale(JSContext* cx);
 
-  JS::Heap<JS::Value>* textureVal;
+  JS::Heap<JS::Value>* texturesVal;
 
   // Text
   JS::Heap<JS::Value>* textVal;

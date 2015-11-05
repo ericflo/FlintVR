@@ -14,7 +14,7 @@ CoreModel::CoreModel(void) :
   id = CURRENT_MODEL_ID++;
   collisionShape = NULL;
   collisionObj = NULL;
-  textureVal = NULL;
+  texturesVal = NULL;
   textVal = NULL;
   textColorVal = NULL;
   collideTagVal = NULL;
@@ -25,7 +25,7 @@ CoreModel::~CoreModel(void) {
   delete selfVal;
   delete geometryVal;
   delete programVal;
-  delete textureVal;
+  delete texturesVal;
   delete textVal;
   delete textColorVal;
   delete matrixVal;
@@ -295,12 +295,44 @@ void CoreModel::DrawEyeView(JSContext* cx,
     // Switch to our program
     glUseProgram(prog->program);
 
-    // Use the current texture
-    if (textureVal != NULL && !textureVal->isNullOrUndefined() && textureVal->isObject()) {
-      JS::RootedObject texObj(cx, &textureVal->toObject());
-      CoreTexture* tex = GetCoreTexture(texObj);
-      if (tex != NULL) {
-        glActiveTexture(GL_TEXTURE0);
+    // Bind textures
+    if (ValueDefined(texturesVal)) {
+      JS::RootedValue textures(cx, *texturesVal);
+
+      // Check that we were actually handed an array object
+      bool isArray;
+      if (!JS_IsArrayObject(cx, textures, &isArray)) {
+        JS_ReportError(cx, "Couldn't determine whether textures was an array");
+        return;
+      }
+      if (!isArray) {
+        JS_ReportError(cx, "Textures should be an array");
+        return;
+      }
+
+      JS::RootedObject texturesObj(cx, &textures.toObject());
+
+      // Get the length of the textures array
+      uint32_t texturesLength;
+      if (!JS_GetArrayLength(cx, texturesObj, &texturesLength)) {
+        JS_ReportError(cx, "Couldn't get textures array length");
+        return;
+      }
+
+      // Iterate through the textures and bind each one
+      JS::RootedValue texture(cx);
+      for (size_t i = 0; i < texturesLength; ++i) {
+        if (!JS_GetElement(cx, texturesObj, i, &texture)) {
+          JS_ReportError(cx, "Couldn't get texture at index %d", i);
+          return;
+        }
+        JS::RootedObject texObj(cx, &texture.toObject());
+        CoreTexture* tex = GetCoreTexture(texObj);
+        if (tex == NULL) {
+          JS_ReportError(cx, "Texture was null at index %d", i);
+          return;
+        }
+        glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(tex->texture.target, tex->texture.texture);
       }
     }
@@ -654,7 +686,7 @@ VRJS_GETSET(CoreModel, matrix)
 VRJS_GETSET(CoreModel, position)
 VRJS_GETSET(CoreModel, rotation)
 VRJS_GETSET(CoreModel, scale)
-VRJS_GETSET(CoreModel, texture)
+VRJS_GETSET(CoreModel, textures)
 VRJS_GETSET(CoreModel, text)
 VRJS_GETSET(CoreModel, textColor)
 VRJS_GETSET(CoreModel, collideTag)
@@ -716,7 +748,7 @@ static JSPropertySpec CoreModel_props[] = {
   VRJS_PROP(CoreModel, position),
   VRJS_PROP(CoreModel, rotation),
   VRJS_PROP(CoreModel, scale),
-  VRJS_PROP(CoreModel, texture),
+  VRJS_PROP(CoreModel, textures),
   VRJS_PROP(CoreModel, text),
   VRJS_PROP(CoreModel, textColor),
   VRJS_PROP(CoreModel, textSize),
@@ -778,10 +810,10 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     model->programVal = new JS::Heap<JS::Value>(program);
   }
 
-  // Texture
-  JS::RootedValue texture(cx);
-  if (JS_GetProperty(cx, opts, "texture", &texture) && !texture.isNullOrUndefined() && texture.isObject()) {
-    model->textureVal = new JS::Heap<JS::Value>(texture);
+  // Textures
+  JS::RootedValue textures(cx);
+  if (JS_GetProperty(cx, opts, "textures", &textures) && !textures.isNullOrUndefined() && textures.isObject()) {
+    model->texturesVal = new JS::Heap<JS::Value>(textures);
   }
 
   // Text
@@ -892,7 +924,7 @@ void CoreModel_trace(JSTracer *tracer, JSObject *obj) {
   JS_CallValueTracer(tracer, model->positionVal, "positionVal");
   JS_CallValueTracer(tracer, model->rotationVal, "rotationVal");
   JS_CallValueTracer(tracer, model->scaleVal, "scaleVal");
-  JS_CallValueTracer(tracer, model->textureVal, "textureVal");
+  JS_CallValueTracer(tracer, model->texturesVal, "texturesVal");
   JS_CallValueTracer(tracer, model->textVal, "textVal");
   JS_CallValueTracer(tracer, model->textColorVal, "textColorVal");
   JS_CallValueTracer(tracer, model->collideTagVal, "collideTagVal");
