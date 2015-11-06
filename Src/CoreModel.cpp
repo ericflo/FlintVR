@@ -56,8 +56,8 @@ CoreModel::~CoreModel(void) {
 void CoreModel::AddModel(JSContext* cx, JS::HandleObject otherModelObj) {
   CoreModel* otherModel = GetCoreModel(otherModelObj);
 
-  // TODO: Is this correct? Propagate the program from the parent?
-  if (!ValueDefined(otherModel->programVal)) {
+  // TODO: Is this the behavior we want? Propagate the program from the parent?
+  if (ValueDefined(programVal) && !ValueDefined(otherModel->programVal)) {
     JS::RootedValue prog(cx, *programVal);
     otherModel->programVal = new JS::Heap<JS::Value>(prog);
   }
@@ -65,7 +65,7 @@ void CoreModel::AddModel(JSContext* cx, JS::HandleObject otherModelObj) {
   // Annotate the scene object on the model
   otherModel->scene = scene;
 
-  // Make sure collision detection is set up and configured
+  // Make sure collision detection is runninggeom->indexCount
   otherModel->StartCollisions(cx);
 
   JS::RootedValue otherModelVal(cx, JS::ObjectOrNullValue(otherModelObj));
@@ -454,6 +454,8 @@ void CoreModel::DrawEyeView(JSContext* cx,
     // Finally, draw the elements
     glDrawElements(GL_TRIANGLES, geom->indexCount, GL_UNSIGNED_SHORT, NULL);
 
+    OVR::GL_CheckErrors("Model - DrawEyeView");
+
     // Unbind
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -731,7 +733,7 @@ bool CoreModel::LoadFile(JSContext* cx) {
   // Load the model file in the memory buffer via Assimp
   Assimp::Importer importer;
   const aiScene* scn = importer.ReadFileFromMemory(buf.Buffer, buf.Length,
-    aiProcessPreset_TargetRealtime_MaxQuality);
+    /*aiProcessPreset_TargetRealtime_MaxQuality*/aiProcessPreset_TargetRealtime_Quality);
 
   // Build a map of all textures
   OVR::Hash<OVR::String, OVR::GlTexture> textureMap;
@@ -747,6 +749,8 @@ bool CoreModel::LoadFile(JSContext* cx) {
       }
 
       OVR::String pathStr(path.data, path.length);
+      __android_log_print(ANDROID_LOG_WARN, LOG_COMPONENT, "pathStr: %s\n", pathStr.ToCStr());
+
       if (pathStr.GetCharAt(0) != '*') {
         continue;
       }
@@ -775,6 +779,7 @@ bool CoreModel::LoadFile(JSContext* cx) {
         textureHeights.Set(pathStr, texture->mHeight);
       }
       textureMap.Set(pathStr, tex);
+      __android_log_print(ANDROID_LOG_WARN, LOG_COMPONENT, "textureMap.Set %s %d\n", pathStr.ToCStr(), tex.texture);
     }
   }
 
@@ -782,13 +787,22 @@ bool CoreModel::LoadFile(JSContext* cx) {
   for (unsigned int meshNum = 0; meshNum < scn->mNumMeshes; ++meshNum) {
     aiMesh* mesh = scn->mMeshes[meshNum];
 
+    // If there are no position vertices, we don't have anything to do, so skip
+    if (!mesh->HasPositions()) {
+      continue;
+    }
+
     // Build up our vertex attributes
     OVR::VertexAttribs* vertices = new OVR::VertexAttribs();
 
     vertices->position.Resize(mesh->mNumVertices);
-    vertices->normal.Resize(mesh->mNumVertices);
-    vertices->tangent.Resize(mesh->mNumVertices);
-    vertices->binormal.Resize(mesh->mNumVertices);
+    if (mesh->HasNormals()) {
+      vertices->normal.Resize(mesh->mNumVertices);
+    }
+    if (mesh->HasTangentsAndBitangents()) {
+      vertices->tangent.Resize(mesh->mNumVertices);
+      vertices->binormal.Resize(mesh->mNumVertices);
+    }
     vertices->color.Resize(mesh->mNumVertices);
     if (mesh->GetNumUVChannels() > 0) {
       vertices->uv0.Resize(mesh->mNumVertices);
@@ -800,20 +814,24 @@ bool CoreModel::LoadFile(JSContext* cx) {
 
     for (unsigned int vertexNum = 0; vertexNum < mesh->mNumVertices; ++vertexNum) {
       aiVector3D vertex = mesh->mVertices[vertexNum];
-      vertices->position.PushBack(OVR::Vector3f(vertex.x, vertex.y, vertex.z));
+      vertices->position[vertexNum] = OVR::Vector3f(vertex.x, vertex.y, vertex.z);
 
-      aiVector3D normal = mesh->mNormals[vertexNum];
-      vertices->normal.PushBack(OVR::Vector3f(normal.x, normal.y, normal.z));
+      if (mesh->HasNormals()) {
+        aiVector3D normal = mesh->mNormals[vertexNum];
+        vertices->normal[vertexNum] = OVR::Vector3f(normal.x, normal.y, normal.z);
+      }
 
-      aiVector3D tangent = mesh->mTangents[vertexNum];
-      vertices->tangent.PushBack(OVR::Vector3f(tangent.x, tangent.y, tangent.z));
+      if (mesh->HasTangentsAndBitangents()) {
+        aiVector3D tangent = mesh->mTangents[vertexNum];
+        vertices->tangent[vertexNum] = OVR::Vector3f(tangent.x, tangent.y, tangent.z);
 
-      aiVector3D binormal = mesh->mBitangents[vertexNum];
-      vertices->binormal.PushBack(OVR::Vector3f(binormal.x, binormal.y, binormal.z));
+        aiVector3D binormal = mesh->mBitangents[vertexNum];
+        vertices->binormal[vertexNum] = OVR::Vector3f(binormal.x, binormal.y, binormal.z);
+      }
       
       if (mesh->GetNumColorChannels() > 0) {
         aiColor4D* color = mesh->mColors[vertexNum];
-        vertices->color.PushBack(OVR::Vector4f(color[0].r, color[0].g, color[0].b, color[0].a));
+        vertices->color[vertexNum] = OVR::Vector4f(color[0].r, color[0].g, color[0].b, color[0].a);
       }
       if (mesh->GetNumColorChannels() > 1) {
         __android_log_print(ANDROID_LOG_WARN, LOG_COMPONENT, "Discarding extra color channels\n");
@@ -822,11 +840,11 @@ bool CoreModel::LoadFile(JSContext* cx) {
       // TODO: Figure out how to not throw away a whole dimension for these UVs
       if (mesh->GetNumUVChannels() > 0) {
         aiVector3D uv = mesh->mTextureCoords[0][vertexNum];
-        vertices->uv0.PushBack(OVR::Vector2f(uv.x, uv.y));
+        vertices->uv0[vertexNum] = OVR::Vector2f(uv.x, uv.y);
       }
       if (mesh->GetNumUVChannels() > 1) {
         aiVector3D uv = mesh->mTextureCoords[1][vertexNum];
-        vertices->uv0.PushBack(OVR::Vector2f(uv.x, uv.y));
+        vertices->uv1[vertexNum] = OVR::Vector2f(uv.x, uv.y);
       }
       if (mesh->GetNumUVChannels() > 2) {
         __android_log_print(ANDROID_LOG_WARN, LOG_COMPONENT, "Discarding extra UV channels\n");
@@ -836,11 +854,16 @@ bool CoreModel::LoadFile(JSContext* cx) {
     // Build up our geometry indices
     OVR::Array<OVR::TriangleIndex> indices;
     indices.Resize(mesh->mNumFaces * 3);
+    int indexIdx = 0; // lol
     for (unsigned int faceNum = 0; faceNum < mesh->mNumFaces; ++faceNum) {
       aiFace face = mesh->mFaces[faceNum];
+      if (face.mNumIndices != 3) { // Skip anything that's not a triangle
+        continue;
+      }
       for (unsigned int indexNum = 0; indexNum < face.mNumIndices; ++indexNum) {
         unsigned int index = face.mIndices[indexNum];
-        indices.PushBack(index);
+        indices[indexIdx] = index;
+        indexIdx++;
       }
     }
 
@@ -853,6 +876,9 @@ bool CoreModel::LoadFile(JSContext* cx) {
     for (int i = 0; i < textureCount; ++i) {
       if (material->GetTexture(aiTextureType_DIFFUSE, i, &texturePath) == AI_SUCCESS) {
         OVR::String texturePathStr(texturePath.data, texturePath.length);
+        if (texturePathStr.GetCharAt(0) != '*') {
+          continue;
+        }
         OVR::GlTexture tex = *(textureMap.Get(texturePathStr));
         int width = *(textureWidths.Get(texturePathStr));
         int height = *(textureHeights.Get(texturePathStr));
@@ -877,15 +903,21 @@ bool CoreModel::LoadFile(JSContext* cx) {
 
     // Add the model's textures
     if (textureArrayCount > 0) {
-      model->texturesVal = new JS::Heap<JS::Value>(JS::ObjectOrNullValue(textureArray));
+      model->texturesVal = new JS::Heap<JS::Value>(
+        JS::ObjectOrNullValue(textureArray));
     }
 
     // Fill any defaults we haven't filled in (all of them)
     model->FillDefaults(cx);
 
     JS::RootedObject submodel(cx, NewCoreModel(cx, model));
+    JS::RootedValue sval(cx, JS::ObjectOrNullValue(submodel));
+    model->selfVal = new JS::Heap<JS::Value>(sval);
+
     AddModel(cx, submodel);
   }
+
+  OVR::GL_CheckErrors("LoadFile");
 
   return true;
 }
@@ -1066,15 +1098,6 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
     model->texturesVal = new JS::Heap<JS::Value>(textures);
   }
 
-  // File
-  JS::RootedValue fileVal(cx);
-  if (JS_GetProperty(cx, opts, "file", &fileVal) && !fileVal.isNullOrUndefined() && fileVal.isString()) {
-    model->fileVal = new JS::Heap<JS::Value>(fileVal);
-    if (!model->LoadFile(cx)) {
-      return false;
-    }
-  }
-
   // Text
   JS::RootedValue text(cx);
   if (JS_GetProperty(cx, opts, "text", &text) && !text.isNullOrUndefined() && text.isString()) {
@@ -1152,6 +1175,15 @@ bool CoreModel_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   SetMaybeCallback(cx, &opts, "onCollideEnd", &model->onCollideEndVal);
 
   model->FillDefaults(cx);
+
+  // Load file contents
+  JS::RootedValue fileVal(cx);
+  if (JS_GetProperty(cx, opts, "file", &fileVal) && !fileVal.isNullOrUndefined() && fileVal.isString()) {
+    model->fileVal = new JS::Heap<JS::Value>(fileVal);
+    if (!model->LoadFile(cx)) {
+      return false;
+    }
+  }
 
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));
@@ -1245,7 +1277,7 @@ bool CoreModel_remove(JSContext* cx, unsigned argc, JS::Value *vp) {
   otherModel->StopCollisions();
 
   // Remove the scene object from the model
-  otherModel->scene = nullptr;
+  otherModel->scene = NULL;
 
   if (!thisModel->RemoveModel(cx, otherModel)) {
     JS_ReportError(cx, "Could not find model to remove");

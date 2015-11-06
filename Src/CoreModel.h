@@ -2,7 +2,6 @@
 #define CORE_MODEL_H
 
 #include "BaseInclude.h"
-#include "Kernel/OVR_Geometry.h"
 #include "CoreGeometry.h"
 #include "CoreProgram.h"
 #include "CoreVector3f.h"

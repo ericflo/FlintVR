@@ -3,3 +3,4 @@ Projects/Android/gen/*
 Projects/Android/obj/*
 Projects/Android/libs/*
 assets/oculussig_*
+*.DS_Store

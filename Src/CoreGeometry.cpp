@@ -106,8 +106,7 @@ bool CoreGeometry_constructor(JSContext* cx, unsigned argc, JS::Value *vp) {
   }
 
   // Now we create our geometry
-  CoreGeometry* geometry = new CoreGeometry(vert, idc);
-  JS::RootedObject self(cx, NewCoreGeometry(cx, geometry));
+  JS::RootedObject self(cx, NewCoreGeometry(cx, new CoreGeometry(vert, idc)));
 
   // Return our self object
   args.rval().set(JS::ObjectOrNullValue(self));
@@ -182,7 +181,7 @@ void SetupCoreGeometry(JSContext* cx, JS::RootedObject *global, JS::RootedObject
   }
 }
 
-JSObject* NewCoreGeometry(JSContext* cx, CoreGeometry *geometry) {
+JSObject* NewCoreGeometry(JSContext* cx, CoreGeometry* geometry) {
   JS::RootedObject self(cx, JS_NewObject(cx, &coreGeometryClass));
   if (!JS_DefineProperties(cx, self, CoreGeometry_props)) {
     __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not define properties on geometry\n");
