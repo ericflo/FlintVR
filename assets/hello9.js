@@ -29,7 +29,7 @@ function vrmain(env) {
     position: env.core.Vector3f(0, -40, -40),
     //rotation: env.core.Vector3f(Math.PI / 2.0 /* 90 degrees */, 0, 0),
     //scale: env.core.Vector3f(0.2, 0.2, 0.2),
-    file: 'assets/Trident-A10-Embedded.fbx'/*,
+    file: 'assets/cube.fbx'/*,
     onFrame: function(ev) {
       var pos = ev.viewPos.add(ev.viewFwd.multiply(10));
       this.position.x = pos.x;
