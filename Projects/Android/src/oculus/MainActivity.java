@@ -7,39 +7,37 @@ Authors     :
 
 Copyright   :   Copyright 2014 Oculus VR, LLC. All Rights reserved.
 
+
 *************************************************************************************/
-package com.oculus.vrcubeworld;
+package oculus;
 
 import android.os.Bundle;
 import android.util.Log;
 import android.content.Intent;
 import android.content.res.AssetManager;
-
 import com.oculus.vrappframework.VrActivity;
 
 public class MainActivity extends VrActivity {
+	public static final String TAG = "Flint";
 
-	public static final String TAG = "VrCubeWorld";
-	
 	/** Load jni .so on initialization */
 	static {
-		Log.d( TAG, "LoadLibrary" );
-		System.loadLibrary( "vrcubeworld" );
+		Log.d(TAG, "LoadLibrary");
+		System.loadLibrary("ovrapp");
 	}
 
-	public static native long nativeSetAppInterface( VrActivity act, String fromPackageNameString, String commandString, String uriString, AssetManager mgr );
+    public static native long nativeSetAppInterface( VrActivity act, String fromPackageNameString, String commandString, String uriString, AssetManager mgr );
 
-	@Override
-	protected void onCreate(Bundle savedInstanceState) {
-		Log.d( TAG, "onCreate" );
-		super.onCreate(savedInstanceState);
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
 		Intent intent = getIntent();
 		String commandString = VrActivity.getCommandStringFromIntent( intent );
 		String fromPackageNameString = VrActivity.getPackageStringFromIntent( intent );
 		String uriString = VrActivity.getUriStringFromIntent( intent );
-		AssetManager mgr = getResources().getAssets();
+    AssetManager mgr = getResources().getAssets();
 
 		setAppPtr( nativeSetAppInterface( this, fromPackageNameString, commandString, uriString, mgr ) );
-	}
+    }   
 }

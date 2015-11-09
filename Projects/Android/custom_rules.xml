@@ -11,9 +11,9 @@
     </path>
     <!-- <echo>temp="${toString:temp.path}"</echo> -->
     <path id="project.all.jars.path">
-      <pathelement path="${toString:temp.path}"/>
-      <pathelement location="${vrapi_lib}/VrApi.jar"/>
-      <pathelement location="${vrappframework_lib}/VrAppFramework.jar"/>
+        <pathelement path="${toString:temp.path}"/>
+        <pathelement location="${vrapi_lib}/VrApi.jar"/>
+        <pathelement location="${vrappframework_lib}/VrAppFramework.jar"/>
     </path>
     <!-- <echo>project.all.jars.path="${toString:project.all.jars.path}"</echo> -->
 
@@ -27,6 +27,6 @@
 	  <pathelement location="${vrgui_res}"/>
       <pathelement path="${toString:temp.project.library.res.folder.path}"/>
     </path>
-    <!-- <echo>project.library.res.folder.path="${toString:project.library.res.folder.path}"</echo> -->
+    <!-- <echo>project.library.res.folder.path="${toString:project.library.res.folder.path}"</echo> -->  
   </target>
 </project>

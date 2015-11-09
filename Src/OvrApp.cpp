@@ -32,11 +32,10 @@ void reportError(JSContext* cx, const char *message, JSErrorReport *report) {
   }
 }
 
-class VrCubeWorld : public OVR::VrAppInterface
-{
+class OvrApp : public OVR::VrAppInterface {
 public:
-  VrCubeWorld(AAssetManager *assetManager);
-  ~VrCubeWorld();
+  OvrApp(AAssetManager *assetManager);
+  ~OvrApp();
 
   virtual void Configure(OVR::ovrSettings & settings);
 
@@ -71,7 +70,7 @@ static JSClass globalClass = {
     JSCLASS_GLOBAL_FLAGS
 };
 
-VrCubeWorld::VrCubeWorld(AAssetManager *assetManager) :
+OvrApp::OvrApp(AAssetManager *assetManager) :
   GuiSys(OVR::OvrGuiSys::Create()),
   Locale(NULL),
   Random(2) {
@@ -79,11 +78,11 @@ VrCubeWorld::VrCubeWorld(AAssetManager *assetManager) :
   AssetManager = assetManager;
 }
 
-VrCubeWorld::~VrCubeWorld() {
+OvrApp::~OvrApp() {
   OVR::OvrGuiSys::Destroy(GuiSys);
 }
 
-void VrCubeWorld::OneTimeInit(const char* fromPackageName, const char* launchIntentJSON, const char* launchIntentURI) {
+void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJSON, const char* launchIntentURI) {
   auto java = app->GetJava();
   SoundEffectContext.reset(new OVR::ovrSoundEffectContext(*java->Env, java->ActivityObject));
   SoundEffectContext->Initialize();
@@ -170,26 +169,26 @@ void VrCubeWorld::OneTimeInit(const char* fromPackageName, const char* launchInt
   }
 }
 
-void VrCubeWorld::OneTimeShutdown() {
+void OvrApp::OneTimeShutdown() {
   JS_DestroyContext(SpidermonkeyJSContext);
   JS_DestroyRuntime(SpidermonkeyJSRuntime);
   JS_ShutDown();
 }
 
-void VrCubeWorld::Configure(OVR::ovrSettings & settings) {
+void OvrApp::Configure(OVR::ovrSettings & settings) {
   settings.PerformanceParms.CpuLevel = CPU_LEVEL;
   settings.PerformanceParms.GpuLevel = GPU_LEVEL;
   settings.EyeBufferParms.multisamples = 2;
 }
 
-bool VrCubeWorld::OnKeyEvent(const int keyCode, const int repeatCount, const OVR::KeyEventType eventType) {
+bool OvrApp::OnKeyEvent(const int keyCode, const int repeatCount, const OVR::KeyEventType eventType) {
   if (GuiSys->OnKeyEvent(keyCode, repeatCount, eventType)) {
     return true;
   }
   return false;
 }
 
-OVR::Matrix4f VrCubeWorld::Frame(const OVR::VrFrame& vrFrame) {
+OVR::Matrix4f OvrApp::Frame(const OVR::VrFrame& vrFrame) {
   CenterEyeViewMatrix = vrapi_GetCenterEyeViewMatrix(&app->GetHeadModelParms(), &vrFrame.Tracking, NULL);
 
   // Show any errors
@@ -243,7 +242,7 @@ OVR::Matrix4f VrCubeWorld::Frame(const OVR::VrFrame& vrFrame) {
   return CenterEyeViewMatrix;
 }
 
-OVR::Matrix4f VrCubeWorld::DrawEyeView(const int eye, const float fovDegreesX, const float fovDegreesY, ovrFrameParms& frameParms) {
+OVR::Matrix4f OvrApp::DrawEyeView(const int eye, const float fovDegreesX, const float fovDegreesY, ovrFrameParms& frameParms) {
   const OVR::Matrix4f eyeViewMatrix = vrapi_GetEyeViewMatrix(&app->GetHeadModelParms(), &CenterEyeViewMatrix, eye);
   const OVR::Matrix4f eyeProjectionMatrix = ovrMatrix4f_CreateProjectionFov(fovDegreesX, fovDegreesY, 0.0f, 0.0f, VRAPI_ZNEAR, 0.0f);
   const OVR::Matrix4f eyeViewProjection = eyeProjectionMatrix * eyeViewMatrix;
@@ -263,14 +262,13 @@ OVR::Matrix4f VrCubeWorld::DrawEyeView(const int eye, const float fovDegreesX, c
 
 extern "C" {
 
-long Java_com_oculus_vrcubeworld_MainActivity_nativeSetAppInterface( 
-    JNIEnv *jni, jclass clazz, jobject activity, jstring fromPackageName,
-    jstring commandString, jstring uriString, jobject mgr) {
-  // This is called by the java UI thread.
-  LOG("nativeSetAppInterface");
-  AAssetManager *assetManager = AAssetManager_fromJava(jni, mgr);
-  VrCubeWorld* cubeWorld = new VrCubeWorld(assetManager);
-  return cubeWorld->SetActivity(jni, clazz, activity, fromPackageName, commandString, uriString);
+jlong Java_oculus_MainActivity_nativeSetAppInterface(JNIEnv * jni, jclass clazz, jobject activity,
+	jstring fromPackageName, jstring commandString, jstring uriString, jobject mgr) {
+	// This is called by the java UI thread.
+	LOG("nativeSetAppInterface");
+	AAssetManager *assetManager = AAssetManager_fromJava(jni, mgr);
+  OvrApp* app = new OvrApp(assetManager);
+	return app->SetActivity(jni, clazz, activity, fromPackageName, commandString, uriString);
 }
 
 } // extern "C"
