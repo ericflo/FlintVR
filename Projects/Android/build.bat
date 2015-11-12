@@ -2,7 +2,7 @@
 
 @setlocal enableextensions enabledelayedexpansion
 
-@if not exist "project.properties" @echo Build script must be executed from project directory. & goto :Abort
+@if not exist "build.gradle" @echo Build script must be executed from project directory. & goto :Abort
 
 @set P=..
 

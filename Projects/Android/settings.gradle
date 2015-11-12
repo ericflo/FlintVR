@@ -1,0 +1,4 @@
+rootProject.projectDir = new File(settingsDir, '../../../../..')
+rootProject.name = "Flint"
+
+include ':', 'VrApi:Projects:AndroidPrebuilt', 'VrAppSupport:VrLocale:Projects:AndroidPrebuilt', 'VrAppSupport:VrSound:Projects:AndroidPrebuilt', 'VrSamples:Native:Flint:Projects:Android', 'VrAppSupport:SystemUtils:Projects:AndroidPrebuilt', 'VrAppSupport:VrGUI:Projects:AndroidPrebuilt'

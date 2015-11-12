@@ -255,7 +255,7 @@ OVR::Matrix4f OvrApp::DrawEyeView(const int eye, const float fovDegreesX, const 
     coreScene->DrawEyeView(cx, GuiSys, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
   }
 
-  GuiSys->RenderEyeView( CenterEyeViewMatrix, eyeViewProjection );
+  GuiSys->RenderEyeView( CenterEyeViewMatrix, eyeViewMatrix, eyeProjectionMatrix );
 
   return eyeViewProjection;
 }

@@ -199,16 +199,12 @@ void CoreScene::DrawEyeView(JSContext* cx, OVR::OvrGuiSys* guiSys, const int eye
       glBindTexture(tex->texture.target, 0);
 
       // Configure frame parms (mostly cargo cult from OVR example program)
-      frameParms.WarpOptions = 0; // srgb
-      frameParms.WarpProgram = VRAPI_FRAME_PROGRAM_SIMPLE;
+      frameParms.Flags = 0; // srgb
       frameParms.LayerCount = 1;
       frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].SrcBlend = VRAPI_FRAME_LAYER_BLEND_ONE;
       frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].DstBlend = VRAPI_FRAME_LAYER_BLEND_ZERO;
-      frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].WriteAlpha = false;
+      frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_WORLD].Flags &= ~VRAPI_FRAME_LAYER_FLAG_WRITE_ALPHA;
       frameParms.Layers[VRAPI_FRAME_LAYER_TYPE_OVERLAY].Textures[eye].ColorTextureSwapChain = NULL;
-      for (int i = 0; i < 4; ++i) {
-        frameParms.ProgramParms[i] = 1.0f;
-      }
       OVR::GL_CheckErrors("draw");
     }
   }
