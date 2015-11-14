@@ -412,7 +412,7 @@ bool Core_print(JSContext* cx, unsigned argc, JS::Value *vp) {
     return false;
   }
 
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "PRINT: %s\n", str.ToCStr());
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "PRINT: %s\n", str.ToCStr());
   return true;
 }
 
@@ -423,7 +423,7 @@ void CoreScene_finalize(JSFreeOp *fop, JSObject *obj) {
 }
 
 void CoreScene_trace(JSTracer *tracer, JSObject *obj) {
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing scene\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Tracing scene\n");
   CoreScene* scene = (CoreScene*)JS_GetPrivate(obj);
   if (scene != NULL) {
     TraceHeap(tracer, scene->clearColorVal, "scene", "clearColorVal");
@@ -434,7 +434,7 @@ void CoreScene_trace(JSTracer *tracer, JSObject *obj) {
       TraceHeap(tracer, &scene->children[i], "scene", buffer);
     }
   }
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Done tracing scene\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Done tracing scene\n");
 }
 
 CoreScene* SetupCoreScene(JSContext* cx, JS::RootedObject* global, JS::RootedObject* core, JS::RootedObject* env) {

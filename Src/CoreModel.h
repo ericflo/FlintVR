@@ -12,7 +12,7 @@ class CoreScene;
 
 class CoreModel {
 public:
-	int id;
+  int id;
 
   // State
   bool isHovered;

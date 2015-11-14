@@ -1,6 +1,7 @@
 #include "BaseInclude.h"
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
+#include "Android/JniUtils.h"
 #include "SoundEffectContext.h"
 #include <memory>
 #include "CoreProgram.h"
@@ -54,7 +55,6 @@ private:
   std::unique_ptr<OVR::OvrGuiSys::SoundEffectPlayer> SoundEffectPlayer;
   OVR::OvrGuiSys* GuiSys;
   OVR::ovrLocale* Locale;
-  unsigned int Random;
   ovrMatrix4f CenterEyeViewMatrix;
   AAssetManager* AssetManager;
   JSRuntime* SpidermonkeyJSRuntime;
@@ -66,14 +66,13 @@ private:
 
 // Build global JS object
 static JSClass globalClass = {
-    "global",
-    JSCLASS_GLOBAL_FLAGS
+  "global",
+  JSCLASS_GLOBAL_FLAGS
 };
 
 OvrApp::OvrApp(AAssetManager *assetManager) :
   GuiSys(OVR::OvrGuiSys::Create()),
-  Locale(NULL),
-  Random(2) {
+  Locale(NULL) {
   CenterEyeViewMatrix = ovrMatrix4f_CreateIdentity();
   AssetManager = assetManager;
 }
@@ -96,13 +95,22 @@ void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJS
 
   //app->SetShowFPS(true);
 
-  // Load the script into memory
-  const char* filename = "hello.js";
-  AAsset* asset = AAssetManager_open(AssetManager, filename, AASSET_MODE_BUFFER);
-  if (NULL == asset) {
-    __android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "ASSET NOT FOUND: %s", filename);
+  jclass cls = ovr_GetGlobalClassReference(java->Env, java->ActivityObject, "oculus/MainActivity");
+  jmethodID loadApp = ovr_GetMethodID(java->Env, cls, "loadApp", "(Ljava/lang/String;)Z");
+  OVR::String urlStr("http://flint-hello.ngrok.com");
+  jboolean loaded = java->Env->CallBooleanMethod(java->ActivityObject, loadApp,
+    java->Env->NewStringUTF(urlStr.ToCStr()));
+  if (!loaded) {
+    __android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "Could not load URL");
     return;
   }
+
+  jmethodID getAppEntrypoint = ovr_GetMethodID(java->Env, cls, "getAppEntrypoint", "()Ljava/lang/String;");
+  jstring entrypoint = (jstring)java->Env->CallObjectMethod(java->ActivityObject, getAppEntrypoint);
+  jboolean isCopy;
+  const char* entrypointChars = java->Env->GetStringUTFChars(entrypoint, &isCopy);
+  OVR::String entrypointStr(entrypointChars);
+  java->Env->ReleaseStringUTFChars(entrypoint, entrypointChars);
 
   // Initialize JS engine
   JS_Init();
@@ -122,7 +130,6 @@ void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJS
 
   // Create the global JS object
   JS::RootedObject global(cx, JS::PersistentRootedObject(cx, JS_NewGlobalObject(cx, &globalClass, nullptr, JS::FireOnNewGlobalHook)));
-
   {
     JSAutoCompartment ac(cx, global);
     JS_InitStandardClasses(cx, global);
@@ -130,8 +137,7 @@ void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJS
     // Compile and execute the script that should export vrmain
     CompileOptions.emplace(cx);
     JS::RootedValue rval(cx);
-    bool ok = JS::Evaluate(cx, CompileOptions.ref(), (const char*)AAsset_getBuffer(asset), AAsset_getLength(asset), &rval);
-    AAsset_close(asset);
+    bool ok = JS::Evaluate(cx, CompileOptions.ref(), entrypointStr.ToCStr(), &rval);
     if (!ok) {
       __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not evaluate script");
       app->ShowInfoText(ERROR_DISPLAY_SECONDS, "Could not evaluate script");
@@ -262,13 +268,13 @@ OVR::Matrix4f OvrApp::DrawEyeView(const int eye, const float fovDegreesX, const 
 
 extern "C" {
 
-jlong Java_oculus_MainActivity_nativeSetAppInterface(JNIEnv * jni, jclass clazz, jobject activity,
-	jstring fromPackageName, jstring commandString, jstring uriString, jobject mgr) {
-	// This is called by the java UI thread.
-	LOG("nativeSetAppInterface");
-	AAssetManager *assetManager = AAssetManager_fromJava(jni, mgr);
+jlong Java_oculus_MainActivity_nativeSetAppInterface(JNIEnv* jni, jclass clazz, jobject activity,
+  jstring fromPackageName, jstring commandString, jstring uriString, jobject mgr) {
+  // This is called by the java UI thread.
+  LOG("nativeSetAppInterface");
+  AAssetManager *assetManager = AAssetManager_fromJava(jni, mgr);
   OvrApp* app = new OvrApp(assetManager);
-	return app->SetActivity(jni, clazz, activity, fromPackageName, commandString, uriString);
+  return app->SetActivity(jni, clazz, activity, fromPackageName, commandString, uriString);
 }
 
 } // extern "C"

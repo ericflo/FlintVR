@@ -370,12 +370,12 @@ void CoreTexture_finalize(JSFreeOp *fop, JSObject *obj) {
 }
 
 void CoreTexture_trace(JSTracer *tracer, JSObject *obj) {
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing texture\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Tracing texture\n");
   CoreTexture* tex = (CoreTexture*)JS_GetPrivate(obj);
   if (tex != NULL) {
     TraceHeap(tracer, tex->path, "texture", "pathVal");
   }
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing texture\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Finished tracing texture\n");
 }
 
 void SetupCoreTexture(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {

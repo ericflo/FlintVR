@@ -1,43 +1,54 @@
-/************************************************************************************
-
-Filename    :   MainActivity.java
-Content     :   
-Created     :   
-Authors     :   
-
-Copyright   :   Copyright 2014 Oculus VR, LLC. All Rights reserved.
-
-
-*************************************************************************************/
 package oculus;
 
-import android.os.Bundle;
-import android.util.Log;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.os.Bundle;
+import android.util.Log;
+
 import com.oculus.vrappframework.VrActivity;
 
+import java.io.File;
+import java.io.IOException;
+
 public class MainActivity extends VrActivity {
-	public static final String TAG = "Flint";
+  public static final String TAG = "Flint";
 
-	/** Load jni .so on initialization */
-	static {
-		Log.d(TAG, "LoadLibrary");
-		System.loadLibrary("ovrapp");
-	}
+  private AppLoader mLoader;
 
-    public static native long nativeSetAppInterface( VrActivity act, String fromPackageNameString, String commandString, String uriString, AssetManager mgr );
+  static {
+    Log.d(TAG, "LoadLibrary");
+    System.loadLibrary("ovrapp");
+  }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+  public static native long nativeSetAppInterface(VrActivity act, String fromPackageNameString, String commandString, String uriString, AssetManager mgr);
 
-		Intent intent = getIntent();
-		String commandString = VrActivity.getCommandStringFromIntent( intent );
-		String fromPackageNameString = VrActivity.getPackageStringFromIntent( intent );
-		String uriString = VrActivity.getUriStringFromIntent( intent );
+  public boolean loadApp(String uri) {
+    mLoader = new AppLoader(getCacheDir(), uri);
+    if (!mLoader.Load()) {
+      Log.e("Flint", mLoader.mExc.getLocalizedMessage());
+      return false;
+    }
+    return true;
+  }
+
+  public String getAppTitle() {
+    return mLoader.mManifest.title;
+  }
+
+  public String getAppEntrypoint() {
+    return mLoader.filePath(mLoader.mManifest.entrypoint);
+  }
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+
+    Intent intent = getIntent();
+    String commandString = VrActivity.getCommandStringFromIntent(intent);
+    String fromPackageNameString = VrActivity.getPackageStringFromIntent(intent);
+    String uriString = VrActivity.getUriStringFromIntent(intent);
     AssetManager mgr = getResources().getAssets();
 
-		setAppPtr( nativeSetAppInterface( this, fromPackageNameString, commandString, uriString, mgr ) );
-    }   
+    setAppPtr(nativeSetAppInterface(this, fromPackageNameString, commandString, uriString, mgr));
+  }   
 }

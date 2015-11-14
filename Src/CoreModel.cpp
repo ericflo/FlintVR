@@ -1197,7 +1197,7 @@ void CoreModel_finalize(JSFreeOp *fop, JSObject *obj) {
 }
 
 void CoreModel_trace(JSTracer* tracer, JSObject* obj) {
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing model\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Tracing model\n");
   CoreModel* model = (CoreModel*)JS_GetPrivate(obj);
   if (model != NULL) {
     TraceHeap(tracer, model->geometryVal, "model", "geometryVal");
@@ -1227,7 +1227,7 @@ void CoreModel_trace(JSTracer* tracer, JSObject* obj) {
       TraceHeap(tracer, &model->children[i], "model", buffer);
     }
   }
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing model\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Finished tracing model\n");
 }
 
 bool CoreModel_add(JSContext* cx, unsigned argc, JS::Value *vp) {

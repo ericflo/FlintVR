@@ -6,6 +6,9 @@ dependencies {
   compile project(':VrAppSupport:VrGUI:Projects:AndroidPrebuilt')
   compile project(':VrAppSupport:VrLocale:Projects:AndroidPrebuilt')
   compile project(':VrAppSupport:VrSound:Projects:AndroidPrebuilt')
+  compile files('deps/okio-1.6.0.jar')
+  compile files('deps/okhttp-2.5.0.jar')
+  compile files('deps/moshi-1.0.0.jar')
 }
 
 android {

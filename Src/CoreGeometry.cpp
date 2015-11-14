@@ -120,8 +120,8 @@ void CoreGeometry_finalize(JSFreeOp *fop, JSObject *obj) {
 }
 
 void CoreGeometry_trace(JSTracer *tracer, JSObject *obj) {
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing geometry\n");
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing geometry\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Tracing geometry\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Finished tracing geometry\n");
 }
 
 void SetupCoreGeometry(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {

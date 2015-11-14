@@ -116,13 +116,13 @@ void CoreProgram_finalize(JSFreeOp *fop, JSObject *obj) {
 }
 
 void CoreProgram_trace(JSTracer *tracer, JSObject *obj) {
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Tracing program\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Tracing program\n");
   CoreProgram* program = (CoreProgram*)JS_GetPrivate(obj);
   if (program != NULL) {
     TraceHeap(tracer, program->vertexVal, "program", "vertexVal");
     TraceHeap(tracer, program->fragmentVal, "program", "fragmentVal");
   }
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Finished tracing program\n");
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, "Finished tracing program\n");
 }
 
 void SetupCoreProgram(JSContext* cx, JS::RootedObject *global, JS::RootedObject *core) {

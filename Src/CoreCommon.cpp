@@ -46,8 +46,8 @@ bool ValueDefined(JS::Heap<JS::Value>* val) {
 
 void TraceHeap(JSTracer* tracer, JS::Heap<JS::Value>* val, const char* parentName, const char* name) {
   if (val != NULL) {
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Trace: %s %s\n", parentName, name);
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, " Trace: %s %s\n", parentName, name);
     JS_CallValueTracer(tracer, val, name);
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, " Traced: %s %s\n", parentName, name);
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, " Traced: %s %s\n", parentName, name);
   }
 }

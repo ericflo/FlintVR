@@ -3,5 +3,10 @@ Projects/Android/gen/*
 Projects/Android/obj/*
 Projects/Android/libs/*
 Projects/Android/res/*
+Projects/Android/build/*
 assets/oculussig_*
 *.DS_Store
+npm-debug.log
+.idea
+.idea/*
+*.iml
