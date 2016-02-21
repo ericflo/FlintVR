@@ -1,5 +1,7 @@
 #include "CoreCommon.h"
 
+OVR::String CURRENT_BASE_DIR;
+
 void SetMaybeCallback(JSContext* cx, JS::RootedObject* opts, const char* name, JS::Heap<JS::Value>** out) {
   JS::RootedValue callbackVal(cx);
   if (!JS_GetProperty(cx, *opts, name, &callbackVal) || callbackVal.isNullOrUndefined()) {
@@ -50,4 +52,11 @@ void TraceHeap(JSTracer* tracer, JS::Heap<JS::Value>* val, const char* parentNam
     JS_CallValueTracer(tracer, val, name);
     __android_log_print(ANDROID_LOG_DEBUG, LOG_COMPONENT, " Traced: %s %s\n", parentName, name);
   }
+}
+
+OVR::String FullFilePath(OVR::String & fileStr) {
+  OVR::String base = CURRENT_BASE_DIR;
+  base.StripTrailing("/");
+  // TODO: Strip leading "/" in fileStr
+  return base + "/" + fileStr;
 }

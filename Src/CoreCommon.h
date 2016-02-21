@@ -13,6 +13,8 @@ const static int VERTEX_UV1 = 6;
 const static int VERTEX_JOINT_INDICES = 7;
 const static int VERTEX_JOINT_WEIGHTS = 8;
 
+extern OVR::String CURRENT_BASE_DIR;
+
 #define VRJS_GETSET_POST(ClassName, name, POST) \
   static bool ClassName##_get_##name(JSContext* cx, unsigned argc, JS::Value *vp) { \
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp); \
@@ -57,5 +59,6 @@ bool GetOVRStringVal(JSContext* cx, JS::HandleValue val, OVR::String* out);
 bool GetOVRString(JSContext* cx, JS::HandleString s, OVR::String* out);
 bool ValueDefined(JS::Heap<JS::Value>* val);
 void TraceHeap(JSTracer* tracer, JS::Heap<JS::Value>* val, const char* parentName, const char* name);
+OVR::String FullFilePath(OVR::String & fileStr);
 
 #endif

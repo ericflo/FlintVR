@@ -50,6 +50,9 @@ public:
     return *Locale;
   }
 
+  void LoadURL(OVR::String & url);
+  void LoadAssetFile(OVR::String & path);
+
 private:
   std::unique_ptr<OVR::ovrSoundEffectContext> SoundEffectContext;
   std::unique_ptr<OVR::OvrGuiSys::SoundEffectPlayer> SoundEffectPlayer;
@@ -60,8 +63,9 @@ private:
   JSRuntime* SpidermonkeyJSRuntime;
   JSContext* SpidermonkeyJSContext;
   mozilla::Maybe<JS::PersistentRootedObject> SpidermonkeyGlobal;
-  CoreScene* coreScene;
+  CoreScene* scene;
   mozilla::Maybe<JS::CompileOptions> CompileOptions;
+  JS::Heap<JS::Value>* envValue;
 };
 
 // Build global JS object
@@ -79,6 +83,7 @@ OvrApp::OvrApp(AAssetManager *assetManager) :
 
 OvrApp::~OvrApp() {
   OVR::OvrGuiSys::Destroy(GuiSys);
+  delete envValue;
 }
 
 void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJSON, const char* launchIntentURI) {
@@ -94,23 +99,6 @@ void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJS
   GuiSys->Init(this->app, *SoundEffectPlayer, fontName.ToCStr(), &app->GetDebugLines());
 
   //app->SetShowFPS(true);
-
-  jclass cls = ovr_GetGlobalClassReference(java->Env, java->ActivityObject, "oculus/MainActivity");
-  jmethodID loadApp = ovr_GetMethodID(java->Env, cls, "loadApp", "(Ljava/lang/String;)Z");
-  OVR::String urlStr("http://flint-hello.ngrok.com");
-  jboolean loaded = java->Env->CallBooleanMethod(java->ActivityObject, loadApp,
-    java->Env->NewStringUTF(urlStr.ToCStr()));
-  if (!loaded) {
-    __android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "Could not load URL");
-    return;
-  }
-
-  jmethodID getAppEntrypoint = ovr_GetMethodID(java->Env, cls, "getAppEntrypoint", "()Ljava/lang/String;");
-  jstring entrypoint = (jstring)java->Env->CallObjectMethod(java->ActivityObject, getAppEntrypoint);
-  jboolean isCopy;
-  const char* entrypointChars = java->Env->GetStringUTFChars(entrypoint, &isCopy);
-  OVR::String entrypointStr(entrypointChars);
-  java->Env->ReleaseStringUTFChars(entrypoint, entrypointChars);
 
   // Initialize JS engine
   JS_Init();
@@ -134,14 +122,9 @@ void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJS
     JSAutoCompartment ac(cx, global);
     JS_InitStandardClasses(cx, global);
 
-    // Compile and execute the script that should export vrmain
+    // Create CompileOptions on the stack
+    SpidermonkeyGlobal.reset();
     CompileOptions.emplace(cx);
-    JS::RootedValue rval(cx);
-    bool ok = JS::Evaluate(cx, CompileOptions.ref(), entrypointStr.ToCStr(), &rval);
-    if (!ok) {
-      __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not evaluate script");
-      app->ShowInfoText(ERROR_DISPLAY_SECONDS, "Could not evaluate script");
-    }
 
     // Build the environment to send to vrmain
     JS::RootedObject core(cx, JS_NewObject(cx, nullptr));
@@ -155,23 +138,107 @@ void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJS
     SetupCoreTexture(cx, &global, &core);
     SetupCoreModel(cx, &global, &core);
     JS::RootedObject env(cx, JS_NewObject(cx, nullptr));
-    coreScene = SetupCoreScene(cx, &global, &core, &env);
+    scene = SetupCoreScene(cx, &global, &core, &env);
     if (!JS_SetProperty(cx, env, "core", coreValue)) {
       __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core\n");
       return;
     }
-    JS::RootedValue envValue(cx, JS::ObjectOrNullValue(env));
+    envValue = new JS::Heap<JS::Value>(JS::ObjectOrNullValue(env));
 
-    // Call vrmain from script
+    SpidermonkeyGlobal.reset();
+    SpidermonkeyGlobal.emplace(cx, global);
+  }
+
+  //OVR::String defaultURL("http://flint-hello.ngrok.com");
+  //LoadURL(defaultURL);
+  OVR::String assetPath("assets/hello7.js");
+  LoadAssetFile(assetPath);
+}
+
+void OvrApp::LoadAssetFile(OVR::String & path) {
+  //auto java = app->GetJava();
+  JSContext* cx = SpidermonkeyJSContext;
+
+  {
+    JSAutoCompartment ac(cx, SpidermonkeyGlobal.ref());
+    JS::RootedValue env(cx, *envValue);
+
+    CURRENT_BASE_DIR.Clear();
+
+    OVR::MemBufferFile buf(OVR::MemBufferFile::NoInit);
+    if (!OVR::ovr_ReadFileFromApplicationPackage(path.ToCStr(), buf)) {
+      __android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "Could not load model file %s", path.ToCStr());
+      return;
+    }
+
+    // Now eval our script so we can get at the vrmain function
+    JS::RootedValue rval(cx);
+    bool ok = JS::Evaluate(cx, CompileOptions.ref(), (char *)buf.Buffer, buf.Length, &rval);
+    if (!ok) {
+      __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not evaluate script");
+      app->ShowInfoText(ERROR_DISPLAY_SECONDS, "Could not evaluate script");
+    }
+
+    // Call vrmain
     if (ok) {
-      ok = JS_CallFunctionName(cx, global, "vrmain", JS::HandleValueArray(envValue), &rval);
+      ok = JS_CallFunctionName(cx, SpidermonkeyGlobal.ref(), "vrmain", JS::HandleValueArray(env), &rval);
       if (!ok) {
         __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call vrmain\n");
       }
     }
+  }
+}
 
-    SpidermonkeyGlobal.reset();
-    SpidermonkeyGlobal.emplace(cx, global);
+void OvrApp::LoadURL(OVR::String & url) {
+  auto java = app->GetJava();
+  JSContext* cx = SpidermonkeyJSContext;
+
+  //CURRENT_URL = url;
+
+  {
+    JSAutoCompartment ac(cx, SpidermonkeyGlobal.ref());
+    JS::RootedValue env(cx, *envValue);
+
+    // Load the remote app
+    jclass cls = ovr_GetGlobalClassReference(java->Env, java->ActivityObject, "oculus/MainActivity");
+    jmethodID loadApp = ovr_GetMethodID(java->Env, cls, "loadApp", "(Ljava/lang/String;)Z");
+    jboolean loaded = java->Env->CallBooleanMethod(java->ActivityObject, loadApp,
+      java->Env->NewStringUTF(url.ToCStr()));
+    if (!loaded) {
+      __android_log_print(ANDROID_LOG_VERBOSE, LOG_COMPONENT, "Could not load URL");
+      return;
+    }
+
+    // Get the app's entrypoint
+    jmethodID getAppEntrypoint = ovr_GetMethodID(java->Env, cls, "getAppEntrypoint", "()Ljava/lang/String;");
+    jstring entrypoint = (jstring)java->Env->CallObjectMethod(java->ActivityObject, getAppEntrypoint);
+    jboolean isCopy;
+    const char* entrypointChars = java->Env->GetStringUTFChars(entrypoint, &isCopy);
+    OVR::String entrypointStr(entrypointChars);
+    java->Env->ReleaseStringUTFChars(entrypoint, entrypointChars);
+
+    // Get the base directory
+    jmethodID getBaseDir = ovr_GetMethodID(java->Env, cls, "getBaseDir", "()Ljava/lang/String;");
+    jstring baseDir = (jstring)java->Env->CallObjectMethod(java->ActivityObject, getBaseDir);
+    const char* baseDirChars = java->Env->GetStringUTFChars(baseDir, &isCopy);
+    CURRENT_BASE_DIR = OVR::String(baseDirChars);
+    java->Env->ReleaseStringUTFChars(baseDir, baseDirChars);
+
+    // Now eval our script so we can get at the vrmain function
+    JS::RootedValue rval(cx);
+    bool ok = JS::Evaluate(cx, CompileOptions.ref(), entrypointStr.ToCStr(), &rval);
+    if (!ok) {
+      __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not evaluate script");
+      app->ShowInfoText(ERROR_DISPLAY_SECONDS, "Could not evaluate script");
+    }
+
+    // Call vrmain
+    if (ok) {
+      ok = JS_CallFunctionName(cx, SpidermonkeyGlobal.ref(), "vrmain", JS::HandleValueArray(env), &rval);
+      if (!ok) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not call vrmain\n");
+      }
+    }
   }
 }
 
@@ -236,10 +303,10 @@ OVR::Matrix4f OvrApp::Frame(const OVR::VrFrame& vrFrame) {
     }
     JS::RootedValue evValue(cx, JS::ObjectOrNullValue(ev));
 
-    coreScene->ComputeMatrices(cx);
-    coreScene->CallFrameCallbacks(cx, evValue);
-    coreScene->CallGazeCallbacks(cx, GuiSys, viewPos, viewFwd, vrFrame, evValue);
-    coreScene->PerformCollisionDetection(cx, now, evValue);
+    scene->ComputeMatrices(cx);
+    scene->CallFrameCallbacks(cx, evValue);
+    scene->CallGazeCallbacks(cx, GuiSys, viewPos, viewFwd, vrFrame, evValue);
+    scene->PerformCollisionDetection(cx, now, evValue);
   }
 
   // Update GUI systems last, but before rendering anything.
@@ -258,7 +325,7 @@ OVR::Matrix4f OvrApp::DrawEyeView(const int eye, const float fovDegreesX, const 
   JS::RootedObject global(cx, SpidermonkeyGlobal.ref());
   {
     JSAutoCompartment ac(cx, global);
-    coreScene->DrawEyeView(cx, GuiSys, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
+    scene->DrawEyeView(cx, GuiSys, eye, eyeViewMatrix, eyeProjectionMatrix, eyeViewProjection, frameParms);
   }
 
   GuiSys->RenderEyeView( CenterEyeViewMatrix, eyeViewMatrix, eyeProjectionMatrix );

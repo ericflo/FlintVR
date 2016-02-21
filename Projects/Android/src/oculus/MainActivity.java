@@ -39,6 +39,15 @@ public class MainActivity extends VrActivity {
     return mLoader.filePath(mLoader.mManifest.entrypoint);
   }
 
+  public String getBaseDir() {
+    try {
+      return AppLoader.BaseDir(getCacheDir(), mLoader.mUri).getCanonicalPath().trim();
+    } catch (IOException e) {
+      Log.e("Flint", "Could not get base dir: " + e.getLocalizedMessage());
+      return "";
+    }
+  }
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);

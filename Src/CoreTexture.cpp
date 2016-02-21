@@ -56,11 +56,20 @@ bool CoreTexture::RebuildCubemap(JSContext* cx, OVR::String pathStr) {
   const char* const cubeSuffix[6] = {"_px", "_nx", "_py", "_ny", "_pz", "_nz"};
   for (int side = 0; side < 6; ++side) {
     OVR::String sidePath = noExt + OVR::String(cubeSuffix[side]) + ext;
-    // Get it from the package for now
-    // TODO: Pull from somewhere else?
-    if (!OVR::ovr_ReadFileFromApplicationPackage(sidePath.ToCStr(), mbfs[side])) {
-      return false;
+    if (CURRENT_BASE_DIR.IsEmpty()) {
+      if (!OVR::ovr_ReadFileFromApplicationPackage(sidePath.ToCStr(), mbfs[side])) {
+        JS_ReportError(cx, "Could not load cube file");
+        return false;
+      }
+    } else {
+      OVR::String fullFileStr = FullFilePath(sidePath);
+      if (!mbfs[side].LoadFile(fullFileStr.ToCStr())) {
+        JS_ReportError(cx, "Could not load cube file");
+        return false;
+      }
     }
+    
+    
   }
 
   unsigned char* data[6];
@@ -128,12 +137,19 @@ bool CoreTexture::RebuildTexture(JSContext* cx, OVR::String pathStr) {
     return true;
   }
 
-  // Get it from the package for now
-  // TODO: Pull from somewhere else?
   OVR::MemBufferFile bufferFile(OVR::MemBufferFile::NoInit);
-  if (!OVR::ovr_ReadFileFromApplicationPackage(pathStr.ToCStr(), bufferFile)) {
-    JS_ReportError(cx, "Could not read texture from application package");
-    return false;
+
+  if (CURRENT_BASE_DIR.IsEmpty()) {
+    if (!OVR::ovr_ReadFileFromApplicationPackage(pathStr.ToCStr(), bufferFile)) {
+      JS_ReportError(cx, "Could not read texture from application package");
+      return false;
+    }
+  } else {
+    OVR::String fullFileStr = FullFilePath(pathStr);
+    if (!bufferFile.LoadFile(fullFileStr.ToCStr())) {
+      JS_ReportError(cx, "Could not read texture %s", fullFileStr.ToCStr());
+      return false;
+    }
   }
 
   // Now load it
