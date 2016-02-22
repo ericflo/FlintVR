@@ -16,8 +16,6 @@ var VERTEX_POSITION = Flint.Core.VERTEX_POSITION;
 var VERTEX_COLOR    = Flint.Core.VERTEX_COLOR;
 
 function vrmain(env) {
-  ////////////////////////////////////////////
-
   Flint.scene.setClearColor(Vector4f(1, 1, 1, 1));
 
   var program = Program((

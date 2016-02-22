@@ -81,7 +81,6 @@ function vrmain(env) {
     scale: Vector3f(0.02, 0.02, 0.02),
     onFrame: function(ev) {
       var pos = ev.viewPos.add(ev.viewFwd.multiply(5));
-      // TODO: Make this not necessary
       this.position.x = pos.x;
       this.position.y = pos.y;
       this.position.z = pos.z;
