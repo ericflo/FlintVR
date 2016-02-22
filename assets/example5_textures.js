@@ -1,32 +1,16 @@
+var Geometry        = Flint.Core.Geometry;
+var Program         = Flint.Core.Program;
+var Model           = Flint.Core.Model;
+var Texture         = Flint.Core.Texture;
+var Vector2f        = Flint.Core.Vector2f;
+var Vector3f        = Flint.Core.Vector3f;
+var Vector4f        = Flint.Core.Vector4f;
+var Matrix4f        = Flint.Core.Matrix4f;
+var VERTEX_POSITION = Flint.Core.VERTEX_POSITION;
+var VERTEX_COLOR    = Flint.Core.VERTEX_COLOR;
+var VERTEX_UV0      = Flint.Core.VERTEX_UV0;
+
 function vrmain(env) {
-  env.scene.background = env.core.Texture({
-    path: 'assets/ggp.jpg',
-    width: 7168,
-    height: 3584
-  });
-  /*
-  env.scene.background = env.core.Texture({
-    path: 'assets/CubePano.jpg',
-    width: 1536,
-    height: 1536,
-    cube: true
-  });
-  */
-
-  ////////////////////////////////////////////
-  var Geometry        = env.core.Geometry;
-  var Program         = env.core.Program;
-  var Model           = env.core.Model;
-  var Texture         = env.core.Texture;
-  var Vector2f        = env.core.Vector2f;
-  var Vector3f        = env.core.Vector3f;
-  var Vector4f        = env.core.Vector4f;
-  var Matrix4f        = env.core.Matrix4f;
-  var VERTEX_POSITION = env.core.VERTEX_POSITION;
-  var VERTEX_COLOR    = env.core.VERTEX_COLOR;
-  var VERTEX_UV0      = env.core.VERTEX_UV0;
-  ////////////////////////////////////////////
-
   var program = Program((
     '#version 300 es\n'+
     'in vec3 Position;\n'+
@@ -97,5 +81,5 @@ function vrmain(env) {
       this.rotation.y = secondsElapsed * 0.8;
     },
   });
-  env.scene.add(cube);
+  Flint.scene.add(cube);
 }

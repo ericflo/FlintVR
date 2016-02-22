@@ -15,6 +15,10 @@
 
 #define ERROR_DISPLAY_SECONDS 10
 
+#define LOAD_FROM_FILE true
+#define SCRIPT_PATH "assets/example1_cubes_and_stars.js"
+#define SCRIPT_URL "http://flint-hello.ngrok.com"
+
 static const int CPU_LEVEL = 1;
 static const int GPU_LEVEL = 1;
 
@@ -139,20 +143,30 @@ void OvrApp::OneTimeInit(const char* fromPackageName, const char* launchIntentJS
     SetupCoreModel(cx, &global, &core);
     JS::RootedObject env(cx, JS_NewObject(cx, nullptr));
     scene = SetupCoreScene(cx, &global, &core, &env);
-    if (!JS_SetProperty(cx, env, "core", coreValue)) {
+    if (!JS_SetProperty(cx, env, "Core", coreValue)) {
       __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core\n");
       return;
     }
     envValue = new JS::Heap<JS::Value>(JS::ObjectOrNullValue(env));
 
+    // Now set up the Flint object in the global namespace
+    JS::RootedValue rootedEnv(cx, JS::ObjectOrNullValue(env));
+    if (!JS_SetProperty(cx, global, "Flint", rootedEnv)) {
+      __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "Could not add env.core\n");
+      return;
+    }
+
     SpidermonkeyGlobal.reset();
     SpidermonkeyGlobal.emplace(cx, global);
   }
 
-  //OVR::String defaultURL("http://flint-hello.ngrok.com");
-  //LoadURL(defaultURL);
-  OVR::String assetPath("assets/hello7.js");
-  LoadAssetFile(assetPath);
+  if (LOAD_FROM_FILE) {
+    OVR::String assetPath(SCRIPT_PATH);
+    LoadAssetFile(assetPath);
+  } else {
+    OVR::String scriptUrl(SCRIPT_URL);
+    LoadURL(scriptUrl);
+  }
 }
 
 void OvrApp::LoadAssetFile(OVR::String & path) {

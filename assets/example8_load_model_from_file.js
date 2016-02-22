@@ -1,6 +1,6 @@
 function vrmain(env) {
 
-  var program = env.core.Program((
+  var program = Flint.Core.Program((
     '#version 300 es\n'+
     'in vec3 Position;\n'+
     'in vec2 TexCoord;\n'+
@@ -24,23 +24,23 @@ function vrmain(env) {
     '}'
   ));
 
-  var wrench = env.core.Model({
+  var wrench = Flint.Core.Model({
     program: program,
-    position: env.core.Vector3f(0, -40, -40),
-    //rotation: env.core.Vector3f(Math.PI / 2.0 /* 90 degrees */, 0, 0),
-    //scale: env.core.Vector3f(0.2, 0.2, 0.2),
-    file: 'assets/cube.fbx'/*,
+    position: Flint.Core.Vector3f(0, -40, -40),
+    rotation: Flint.Core.Vector3f(Math.PI / 2.0 /* 90 degrees */, 0, 0),
+    scale: Flint.Core.Vector3f(0.2, 0.2, 0.2),
+    file: 'assets/cube.fbx',
     onFrame: function(ev) {
-      var pos = ev.viewPos.add(ev.viewFwd.multiply(10));
+      var pos = ev.viewPos.add(ev.viewFwd.multiply(5));
       this.position.x = pos.x;
       this.position.y = pos.y;
       this.position.z = pos.z;
-    }*/
+    }
   });
 
-  env.scene.add(wrench);
+  Flint.scene.add(wrench);
 
-  env.scene.background = env.core.Texture({
+  Flint.scene.background = Flint.Core.Texture({
     path: 'assets/CubePano.jpg',
     width: 1536,
     height: 1536,

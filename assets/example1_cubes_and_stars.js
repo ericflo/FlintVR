@@ -6,18 +6,19 @@ var CUBE_ROWS = 7;
 var CUBE_COLS = 7;
 var CUBE_LAYERS = 1;
 
+var Geometry        = Flint.Core.Geometry;
+var Program         = Flint.Core.Program;
+var Model           = Flint.Core.Model;
+var Vector3f        = Flint.Core.Vector3f;
+var Vector4f        = Flint.Core.Vector4f;
+var Matrix4f        = Flint.Core.Matrix4f;
+var VERTEX_POSITION = Flint.Core.VERTEX_POSITION;
+var VERTEX_COLOR    = Flint.Core.VERTEX_COLOR;
+
 function vrmain(env) {
-  var Geometry        = env.core.Geometry;
-  var Program         = env.core.Program;
-  var Model           = env.core.Model;
-  var Vector3f        = env.core.Vector3f;
-  var Vector4f        = env.core.Vector4f;
-  var Matrix4f        = env.core.Matrix4f;
-  var VERTEX_POSITION = env.core.VERTEX_POSITION;
-  var VERTEX_COLOR    = env.core.VERTEX_COLOR;
   ////////////////////////////////////////////
 
-  env.scene.setClearColor(Vector4f(1, 1, 1, 1));
+  Flint.scene.setClearColor(Vector4f(1, 1, 1, 1));
 
   var program = Program((
     '#version 300 es\n'+
@@ -87,7 +88,7 @@ function vrmain(env) {
     geometry: geometry,
     program: program,
   });
-  env.scene.add(starfield);
+  Flint.scene.add(starfield);
 
   /////// CUBES /////////
 
@@ -153,13 +154,13 @@ function vrmain(env) {
           },
           onGestureTouchUp: function(ev) {
             this._touchdown = false;
-            env.scene.remove(this);
+            Flint.scene.remove(this);
           },
           onGestureTouchCancel: function(ev) {
             this._touchdown = false;
           }
         });
-        env.scene.add(cube);
+        Flint.scene.add(cube);
       }
     }
   }
@@ -195,5 +196,5 @@ function vrmain(env) {
       this.position.z = pos.z;
     }
   });
-  env.scene.add(cursor);
+  Flint.scene.add(cursor);
 }

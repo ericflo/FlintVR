@@ -1,14 +1,13 @@
-function vrmain(env) {
-  var Geometry        = env.core.Geometry;
-  var Program         = env.core.Program;
-  var Model           = env.core.Model;
-  var Vector3f        = env.core.Vector3f;
-  var Vector4f        = env.core.Vector4f;
-  var Matrix4f        = env.core.Matrix4f;
-  var VERTEX_POSITION = env.core.VERTEX_POSITION;
-  var VERTEX_COLOR    = env.core.VERTEX_COLOR;
-  ////////////////////////////////////////////
+var Geometry        = Flint.Core.Geometry;
+var Program         = Flint.Core.Program;
+var Model           = Flint.Core.Model;
+var Vector3f        = Flint.Core.Vector3f;
+var Vector4f        = Flint.Core.Vector4f;
+var Matrix4f        = Flint.Core.Matrix4f;
+var VERTEX_POSITION = Flint.Core.VERTEX_POSITION;
+var VERTEX_COLOR    = Flint.Core.VERTEX_COLOR;
 
+function vrmain(env) {
   var program = Program((
     '#version 300 es\n'+
     'in vec3 Position;\n'+
@@ -16,11 +15,12 @@ function vrmain(env) {
     'uniform mat4 Modelm;\n'+
     'uniform mat4 Viewm;\n'+
     'uniform mat4 Projectionm;\n'+
+    'uniform vec4 colr;\n'+
     'out vec4 fragmentColor;\n'+
     'void main()\n'+
     '{\n'+
     ' gl_Position = Projectionm * (Viewm * (Modelm * vec4(Position, 1.0)));\n'+
-    ' fragmentColor = VertexColor;\n'+
+    '  fragmentColor = colr;\n'+
     '}'
   ), (
     '#version 300 es\n'+
@@ -29,28 +29,6 @@ function vrmain(env) {
     'void main()\n'+
     '{\n'+
     ' outColor = fragmentColor;\n'+
-    '}'
-  ));
-  var redProgram = Program((
-    '#version 300 es\n'+
-    'in vec3 Position;\n'+
-    'in vec4 VertexColor;\n'+
-    'uniform mat4 Modelm;\n'+
-    'uniform mat4 Viewm;\n'+
-    'uniform mat4 Projectionm;\n'+
-    'out vec4 fragmentColor;\n'+
-    'void main()\n'+
-    '{\n'+
-    ' gl_Position = Projectionm * (Viewm * (Modelm * vec4(Position, 1.0)));\n'+
-    ' fragmentColor = VertexColor;\n'+
-    '}'
-  ), (
-    '#version 300 es\n'+
-    'in lowp vec4 fragmentColor;\n'+
-    'out lowp vec4 outColor;\n'+
-    'void main()\n'+
-    '{\n'+
-    ' outColor = vec4(1.0, 0.0, 0.0, 1.0);\n'+
     '}'
   ));
 
@@ -81,6 +59,7 @@ function vrmain(env) {
   var cube1 = Model({
     geometry: cubeGeometry,
     program: program,
+    uniforms: {colr: Vector4f(0, 0, 0, 1)},
     position: Vector3f(0, 0, -15),
     onFrame: function(ev) {
       if (!this._start) {
@@ -92,16 +71,17 @@ function vrmain(env) {
     collideTag: 'cube1',
     collidesWith: {'cube2': true, 'cube3': true},
     onCollideStart: function(ev, other) {
-      this.program = redProgram;
+      this.uniforms.colr = Vector4f(1, 0, 0, 1);
     },
     onCollideEnd: function(ev, other) {
-      this.program = program;
+      this.uniforms.colr = Vector4f(0, 0, 0, 1);
     }
   });
 
   var cube2 = Model({
     geometry: cubeGeometry,
     program: program,
+    uniforms: {colr: Vector4f(0, 0, 0, 1)},
     position: Vector3f(0, 0, -15),
     onFrame: function(ev) {
       if (!this._start) {
@@ -113,16 +93,17 @@ function vrmain(env) {
     collideTag: 'cube2',
     collidesWith: {'cube1': true},
     onCollideStart: function(ev, other) {
-      this.program = redProgram;
+      this.uniforms.colr = Vector4f(1, 0, 0, 1);
     },
     onCollideEnd: function(ev, other) {
-      this.program = program;
+      this.uniforms.colr = Vector4f(0, 0, 0, 1);
     }
   });
 
   var cube3 = Model({
     geometry: cubeGeometry,
     program: program,
+    uniforms: {colr: Vector4f(0, 0, 0, 1)},
     position: Vector3f(-10, 0, -15),
     onFrame: function(ev) {
       if (!this._start) {
@@ -134,14 +115,14 @@ function vrmain(env) {
     collideTag: 'cube3',
     collidesWith: {'cube2': true, 'cube1': true},
     onCollideStart: function(ev, other) {
-      this.program = redProgram;
+      this.uniforms.colr = Vector4f(1, 0, 0, 1);
     },
     onCollideEnd: function(ev, other) {
-      this.program = program;
+      this.uniforms.colr = Vector4f(0, 0, 0, 1);
     }
   });
 
-  env.scene.add(cube1);
-  env.scene.add(cube2);
-  env.scene.add(cube3);
+  Flint.scene.add(cube1);
+  Flint.scene.add(cube2);
+  Flint.scene.add(cube3);
 }

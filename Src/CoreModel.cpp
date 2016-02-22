@@ -332,10 +332,7 @@ void CoreModel::DrawEyeView(JSContext* cx,
                             const OVR::Matrix4f& eyeProjectionMatrix,
                             const OVR::Matrix4f& eyeViewProjection,
                             ovrFrameParms& frameParms) {
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "HMMMMMMM\n");
   if (ValueDefined(geometryVal) && ValueDefined(programVal)) {
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "BOOOOOO\n");
-
     // Extract the rendering primitives
     OVR::GlProgram* prog = program(cx)->program;
     OVR::GlGeometry* geom = geometry(cx)->geometry;
@@ -743,13 +740,10 @@ bool CoreModel::LoadFile(JSContext* cx) {
     }
   }
   
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "ASDF5\n");
-
   // Load the model file in the memory buffer via Assimp
   Assimp::Importer importer;
   const aiScene* scn = importer.ReadFileFromMemory(buf.Buffer, buf.Length,
     /*aiProcessPreset_TargetRealtime_MaxQuality*/aiProcessPreset_TargetRealtime_Quality);
-  __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "ASDF6\n");
 
   // Build a map of all textures
   OVR::Hash<OVR::String, OVR::GlTexture> textureMap;
@@ -757,15 +751,12 @@ bool CoreModel::LoadFile(JSContext* cx) {
   OVR::Hash<OVR::String, int> textureHeights;
   aiString path;
   for (unsigned int materialNum = 0; materialNum < scn->mNumMaterials; ++materialNum) {
-    __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "ASDF7 iteration %d\n", materialNum);
     aiMaterial* material = scn->mMaterials[materialNum];
     int textureCount = material->GetTextureCount(aiTextureType_DIFFUSE);
     for (int textureNum = 0; textureNum < textureCount; ++textureNum) {
-      __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "ASDF8 iteration %d\n", textureNum);
       if (AI_SUCCESS != material->GetTexture(aiTextureType_DIFFUSE, textureNum, &path)) {
         continue;
       }
-      __android_log_print(ANDROID_LOG_ERROR, LOG_COMPONENT, "ASDF9 %s\n", path.data);
 
       OVR::String pathStr(path.data, path.length);
       __android_log_print(ANDROID_LOG_WARN, LOG_COMPONENT, "pathStr: %s\n", pathStr.ToCStr());

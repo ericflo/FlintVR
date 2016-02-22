@@ -1,15 +1,14 @@
-function vrmain(env) {
-  var Geometry        = env.core.Geometry;
-  var Program         = env.core.Program;
-  var Model           = env.core.Model;
-  var Vector3f        = env.core.Vector3f;
-  var Vector4f        = env.core.Vector4f;
-  var Matrix4f        = env.core.Matrix4f;
-  var VERTEX_POSITION = env.core.VERTEX_POSITION;
-  var VERTEX_COLOR    = env.core.VERTEX_COLOR;
-  ////////////////////////////////////////////
+var Geometry        = Flint.Core.Geometry;
+var Program         = Flint.Core.Program;
+var Model           = Flint.Core.Model;
+var Vector3f        = Flint.Core.Vector3f;
+var Vector4f        = Flint.Core.Vector4f;
+var Matrix4f        = Flint.Core.Matrix4f;
+var VERTEX_POSITION = Flint.Core.VERTEX_POSITION;
+var VERTEX_COLOR    = Flint.Core.VERTEX_COLOR;
 
-  env.scene.setClearColor(Vector4f(1, 1, 1, 1));
+function vrmain(env) {
+  Flint.scene.setClearColor(Vector4f(1, 1, 1, 1));
 
   var program = Program((
     '#version 300 es\n'+
@@ -88,7 +87,7 @@ function vrmain(env) {
           this.rotation.y = secondsElapsed * 0.8;
         },
       });
-      env.scene.add(cube);
+      Flint.scene.add(cube);
     }
   }
 }
