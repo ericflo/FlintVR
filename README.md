@@ -1,7 +1,7 @@
 FlintVR
 --------
 
-A Virtual Reality environment engine using C++ and JavaScript.
+An experimental VR engine built in C++, but controlled with JS. 
 
 
 Prerequisites
