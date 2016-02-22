@@ -35,3 +35,25 @@ Running the Other Examples
   * example6_cubemap_background.js
   * example7_text.js
   * example8_load_model_from_file.js
+
+
+Loading from the Internet
+-------------------------
+
+* Modify SCRIPT_URL in Src/OvrApp.cpp to your url
+* Make sure to create a flint.json (like index.html) at docroot
+
+
+Example flint.json
+------------------
+```
+{
+  "title": "Intro to FlintVR App!",
+  "files": [
+    "build/main.js",
+    "textures/texture1.jpg",
+    "textures/texture2.jpg"
+  ],
+  "entrypoint": "build/main.js"
+}
+```
