@@ -27,11 +27,11 @@ Running the Other Examples
 --------------------------
 
 * Modify SCRIPT_PATH in Src/OvrApp.cpp to:
-** example1_cubes_and_stars.js
-** example2_model_parenting.js
-** example3_collision.js
-** example4_dynamic_uniforms.js
-** example5_textures.js
-** example6_cubemap_background.js
-** example7_text.js
-** example8_load_model_from_file.js
+  * example1_cubes_and_stars.js
+  * example2_model_parenting.js
+  * example3_collision.js
+  * example4_dynamic_uniforms.js
+  * example5_textures.js
+  * example6_cubemap_background.js
+  * example7_text.js
+  * example8_load_model_from_file.js
